@@ -1,10 +1,10 @@
-package app.truid.checkmate
+package app.truid.trupal
 
 import org.junit.jupiter.api.Test
 import org.springframework.boot.test.context.SpringBootTest
 
 @SpringBootTest
-class CheckmateApplicationTests {
+class TrupalApplicationTests {
 
     @Test
     fun contextLoads() {

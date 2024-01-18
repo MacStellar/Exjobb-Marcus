@@ -9,10 +9,10 @@
         <relativePath/> <!-- lookup parent from repository -->
     </parent>
     <groupId>app.truid</groupId>
-    <artifactId>checkmate</artifactId>
+    <artifactId>trupal</artifactId>
     <version>0.0.1-SNAPSHOT</version>
-    <name>checkmate</name>
-    <description>checkmate</description>
+    <name>trupal</name>
+    <description>trupal</description>
     <properties>
         <java.version>21</java.version>
         <kotlin.version>1.9.21</kotlin.version>
