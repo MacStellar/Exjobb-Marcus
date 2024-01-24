@@ -13,12 +13,20 @@ class TrupalApplication
 fun main(args: Array<String>) {
     runApplication<TrupalApplication>(*args)
 
+    println("Kör program")
 
 }
 
 @RestController
 class MessageController {
     @GetMapping("/")
-    fun index() = "Hello world!"
-    fun index(@RequestParam(name = "name", defaultValue = "someone") name: String) = "Hello, $name!"
+//    fun index(@RequestParam(name = "name", defaultValue = "someone") name: String) = "Hello, $name!"
+    fun index() = mutableListOf(
+        Message("1", "Hello!"),
+        Message("2", "Bojour!"),
+        Message("3", "Privet!")
+    )
 }
+
+data class Message(val id: String?, val text: String)
+
