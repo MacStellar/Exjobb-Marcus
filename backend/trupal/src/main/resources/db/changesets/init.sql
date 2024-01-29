@@ -16,3 +16,10 @@ CREATE TABLE messages (
     id      VARCHAR(60)  DEFAULT uuid_generate_v4() PRIMARY KEY,
     text    VARCHAR      NOT NULL
 );
+
+--changeset marcusschon:interaction.3
+--precondition-sql-check expectedResult:0 SELECT COUNT(to_regclass('public.dataobjects'));
+CREATE TABLE objects (
+                          id      VARCHAR(60)  DEFAULT uuid_generate_v4() PRIMARY KEY,
+                          object    JSONB      NOT NULL
+);

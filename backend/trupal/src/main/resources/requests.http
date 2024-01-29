@@ -24,8 +24,17 @@ Content-Type: application/json
   "text": "Privet!"
 }
 
+### Post Object
+
+POST http://localhost:8080/
+Content-Type: application/json
+
+{
+  "text": "hej123"
+}
+
 ### Get all the messages
 GET http://localhost:8080/
 
 ### Get the message by its id
-GET http://localhost:8080/a3eb85d5-1619-4473-9a06-cd2280e2ee48
+GET http://localhost:8080/e85816aa-fe87-4e1a-886e-8fa40efbaeda
