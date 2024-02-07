@@ -5,13 +5,19 @@ spring:
     password: password
   liquibase:
     change-log: classpath:db/db.changelog-master.yaml
+  #Importera från local filen
+  profiles:
+    include:
+      - local
+
+#Inlagt från example-backend
 
 app:
   domain: ${TRUID_EXAMPLE_DOMAIN:http://localhost:8080}
 
 web:
   signup:
-    success: ${app.domain}/signup/success.html
+    success: ${app.domain}/signup/success/
     failure: ${app.domain}/signup/failure.html
   login:
     success: ${app.domain}/login/index.html
@@ -21,8 +27,8 @@ web:
     failure: ${app.domain}/sign/failure.html
 
 oauth2:
-  clientId: ${TRUID_CLIENT_ID}
-  clientSecret: ${TRUID_CLIENT_SECRET}
+  clientId: ${TRUID_CLIENT_ID:test}
+  clientSecret: ${TRUID_CLIENT_SECRET:test}
   redirectUri:
     signup: ${TRUID_REDIRECT_URI_SIGNUP:${app.domain}/truid/v1/complete-signup}
     login: ${TRUID_REDIRECT_URI_LOGIN:${app.domain}/truid/v1/complete-login}
