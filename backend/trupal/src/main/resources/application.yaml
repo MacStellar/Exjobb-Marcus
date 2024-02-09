@@ -6,9 +6,9 @@ spring:
   liquibase:
     change-log: classpath:db/db.changelog-master.yaml
   #Importera från local filen
-  profiles:
-    include:
-      - local
+#  profiles:
+#    include:
+#      - local
 
 #Inlagt från example-backend
 
@@ -17,7 +17,8 @@ app:
 
 web:
   signup:
-    success: ${app.domain}/signup/success/
+#    Ändrade denna för att kunna presentera email
+    success: ${app.domain}/truid/v1/presentation
     failure: ${app.domain}/signup/failure.html
   login:
     success: ${app.domain}/login/index.html

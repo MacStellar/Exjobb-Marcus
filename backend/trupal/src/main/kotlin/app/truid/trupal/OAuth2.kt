@@ -54,9 +54,10 @@ fun createOauth2State(session: HttpSession): String {
 // Min variant
 
 fun verifyOauth2State(session: HttpSession, state: String?): Boolean {
-//    val savedState = session.attributes.remove("oauth2-state") as String?
-    val savedState = session.removeAttribute("oauth2-state") as String?
+    val savedState= session.getAttribute("oauth2-state") as String?
+
     return savedState != null && state != null && state == savedState
+
 }
 
 // Originalvariant
