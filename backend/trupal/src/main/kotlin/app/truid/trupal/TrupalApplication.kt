@@ -48,11 +48,6 @@ class TrupalApplication {
         }
     }
 
-//    @Bean
-//    fun webClient(): WebClient {
-//        return WebClient.create()
-//    }
-
     @Bean
     fun restTemplate(): RestTemplate {
         return RestTemplate()

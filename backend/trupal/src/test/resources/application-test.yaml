@@ -4,15 +4,15 @@ spring:
 
 oauth2:
   truid:
-#    token-endpoint: ${TRUID_BASEPATH:https://api.truid.app}/oauth2/v1/token
-    token-endpoint: ${wiremock.server.baseUrl}/auth/v1/token
-    #    signup-endpoint: $http://localhost:${wiremock.server.port}/oauth2/v1/authorize/confirm-signup
+    token-endpoint: ${wiremock.server.baseUrl}/oauth2/v1/token
     signup-endpoint: ${wiremock.server.baseUrl}/oauth2/v1/authorize/confirm-signup
-    login-endpoint: ${TRUID_BASEPATH:https://api.truid.app}/oauth2/v1/authorize/login-session
-    sign-endpoint: ${TRUID_BASEPATH:https://api.truid.app}/oauth2/v1/authorize/sign
-    sign-par-endpoint: ${TRUID_BASEPATH:https://api.truid.app}/oauth2/v1/par/sign
-    presentation-endpoint: ${TRUID_BASEPATH:https://api.truid.app}/exchange/v1/presentation
-    signature-endpoint: ${TRUID_BASEPATH:https://api.truid.app}/exchange/v1/signature
+    presentation-endpoint: ${wiremock.server.baseUrl}/exchange/v1/presentation
+
+#    Används inte i SignupControllerTest:
+#    login-endpoint: ${TRUID_BASEPATH:https://api.truid.app}/oauth2/v1/authorize/login-session
+#    sign-endpoint: ${TRUID_BASEPATH:https://api.truid.app}/oauth2/v1/authorize/sign
+#    sign-par-endpoint: ${TRUID_BASEPATH:https://api.truid.app}/oauth2/v1/par/sign
+#    signature-endpoint: ${TRUID_BASEPATH:https://api.truid.app}/exchange/v1/signature
 
 
 

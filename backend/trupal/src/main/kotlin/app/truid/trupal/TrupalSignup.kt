@@ -1,10 +1,10 @@
 package app.truid.trupal
 
+import com.fasterxml.jackson.databind.ObjectMapper
 import jakarta.servlet.http.HttpServletRequest
 import jakarta.servlet.http.HttpServletResponse
 import jakarta.servlet.http.HttpServletResponse.*
 import jakarta.ws.rs.ForbiddenException
-import kotlinx.coroutines.sync.Mutex
 import org.apache.http.client.utils.URIBuilder
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.data.annotation.Id
@@ -62,22 +62,16 @@ class Login(
 ) {
     // This variable acts as our persistence in this example
     private var _persistedRefreshToken: String? = null
-    private val refreshMutex = Mutex()
 
     @GetMapping("/truid/v1/confirm-signup")
     fun test(
         response: HttpServletResponse,
         request: HttpServletRequest,
+//        Value to check for browser or app
         @RequestHeader("X-Requested-With") xRequestedWith: String?,
     ) {
         val session = request.session
-
         clearPersistence()
-
-
-        println("kom in på / sidan")
-        println("client id: $clientId")
-        println("client secret: $clientSecret")
 
         val truidSignupUrl = URIBuilder(truidSignupEndpoint)
             .addParameter("response_type", "code")
@@ -89,16 +83,13 @@ class Login(
             .addParameter("code_challenge_method", "S256")
             .build()
 
-        println("truidSignupUrl: $truidSignupUrl")
+//        println("cookie: ${request.cookies}")
 
-        println("xRequestedWith: $xRequestedWith")
-
+//        Setting redirect link
         response.setHeader("Location", truidSignupUrl.toString())
 
-        println("response getheader: ${response.getHeader("Location")}")
 
-
-
+//        Check if app or browser
         if (xRequestedWith == "XMLHttpRequest") {
             // Return a 202 response in case of an AJAX request
             response.status = SC_ACCEPTED
@@ -109,7 +100,7 @@ class Login(
     }
 
     @GetMapping(path=["/truid/v1/complete-signup"],
-                produces = [APPLICATION_JSON_VALUE]
+//                produces = [APPLICATION_JSON_VALUE, TEXT_HTML_VALUE]
     )
     fun completeSignup(
         @RequestParam("code") code: String?,
@@ -117,22 +108,23 @@ class Login(
         @RequestParam("error") error: String?,
         response: HttpServletResponse,
         request: HttpServletRequest,
-
     ): String? {
         val session = request.session
-
-        println("kom in på /truid/v1/complete-signup sidan")
-
         val presentation: ResponseEntity<PresentationResponse>
 
-//        Fixa så att allt ligger i if,else,try grejen sen
+
+
+        println("code, state, error: $code, $state, $error")
 
         if (error != null) {
             throw Forbidden(error, "There was an authorization error")
-        } else if (!verifyOauth2State(session, state)) {
+        }
+        else if (!verifyOauth2State(session, state)) {
             throw Forbidden("access_denied", "State does not match the expected value")
         } else {
             try {
+                println("kommer hit 1---")
+
                 val body = LinkedMultiValueMap<String, String>()
                 body.add("grant_type", "authorization_code")
                 body.add("code", code)
@@ -141,31 +133,33 @@ class Login(
                 body.add("client_secret", clientSecret)
                 body.add("code_verifier", getOauth2CodeVerifier(session))
 
+
+//                Get token
                 val tokenResponse =
                     restTemplate.postForEntity<TokenResponse>(truidTokenEndpoint, body, TokenResponse::class)
 
+                println("kommer hit 2---")
+//                Create entity with header including access token
+                val header = HttpHeaders()
+                header.contentType = APPLICATION_JSON
+                header.setBearerAuth(tokenResponse.body!!.accessToken)
+                val entity = HttpEntity<String>(header)
 
+
+//                Build presentationUri
                 val getPresentationUri = URIBuilder(truidPresentationEndpoint)
                     .addParameter("claims", "truid.app/claim/email/v1")
                     .build()
 
-                val header = HttpHeaders()
-                header.contentType = APPLICATION_JSON
-                header.setBearerAuth(tokenResponse.body!!.accessToken)
-
-                val entity = HttpEntity<String>(header)
-
-                println("entity: $entity")
-
+                println("kommer hit 3---")
+//                Get presentation with access token
                 presentation =
                     restTemplate.exchange(getPresentationUri, HttpMethod.GET, entity, PresentationResponse::class.java)
 
-                println("presentation: ${presentation.body}")
-                println("presentation email: ${presentation.body?.claims?.get(0)?.value}")
-                println("Fetching presentation: $truidPresentationEndpoint")
 
+
+//                Persist the refresh token
                 persist(tokenResponse.body)
-
             } catch (e: ForbiddenException) {
                 throw Forbidden("access_denied", e.message)
             }
@@ -174,23 +168,25 @@ class Login(
                 // Redirect to success page in the webapp flow
                 response.setHeader("Location", webSuccess.toString())
                 response.status = SC_FOUND
-//            return null
+
             } else {
                 // Return a 200 response in case of an AJAX request
                 response.status = SC_OK
-//            return null
+                println("mobilversion")
             }
 
+
+
+//            Get the email from presentation body and create a database entry
             val email = presentation.body?.claims?.get(0)?.value
             val emailMessage = Message(id = null, text = email)
 
-            println("emailMessageInJson: $emailMessage")
-
             //Get the email from the presentation and save it to the database
-//            saveToDatabase(emailMessage)
+            saveToDatabase(emailMessage)
 
-            return presentation.body?.claims?.get(0)?.value
 
+
+            return null
 
         }
     }
@@ -200,27 +196,28 @@ class Login(
         produces = [APPLICATION_JSON_VALUE]
     )
     fun getPresentation(): String? {
-        println("kom in på /signup/success sidan")
 
 
-
+//        Get the access token
         val accessToken = refreshToken()
 
-        println("accessToken: $accessToken")
 
         val getPresentationUri = URIBuilder(truidPresentationEndpoint)
             .addParameter("claims", "truid.app/claim/email/v1")
             .build()
-//
-//        println("getPresentationUri: $getPresentationUri")
-//
+
+//        Create entity with header including access token
         val header = HttpHeaders()
         header.contentType = APPLICATION_JSON
         header.setBearerAuth(accessToken)
-
         val entity = HttpEntity<String>(header)
 
-        return restTemplate.exchange(getPresentationUri, HttpMethod.GET, entity, PresentationResponse::class.java).body?.claims?.get(0)?.value
+
+        val presentationResponse = restTemplate.exchange(getPresentationUri, HttpMethod.GET, entity, PresentationResponse::class.java)
+        println("presentationResponse statuscode: ${presentationResponse.statusCode}")
+
+
+        return presentationResponse.body?.claims?.get(0)?.value
     }
 
     @ExceptionHandler(Forbidden::class)
@@ -246,12 +243,10 @@ class Login(
     }
 
     private fun refreshToken(): String {
-        // Synchronized, two refreshes with same refresh token
-        // invalidates all access tokens and refresh tokens in accordance to
-        // https://datatracker.ietf.org/doc/html/draft-ietf-oauth-security-topics-15#section-4.12.2
 
         val refreshToken = getPersistedToken() ?: throw Forbidden("access_denied", "No refresh_token found")
 
+        println("kommer förbi getPersistedToken")
         val body = LinkedMultiValueMap<String, String>()
         body.add("grant_type", "refresh_token")
         body.add("refresh_token", refreshToken)
@@ -260,18 +255,13 @@ class Login(
 
         val refreshedTokenResponse = restTemplate.postForEntity<TokenResponse>(truidTokenEndpoint, body, TokenResponse::class).body
 
-//        val refreshedTokenResponse = webClient.post()
-//            .uri(URIBuilder(truidTokenEndpoint).build())
-//            .contentType(APPLICATION_FORM_URLENCODED)
-//            .accept(APPLICATION_JSON)
-//            .body(fromFormData(body))
-//            .retrieve()
-//            .awaitBody<TokenResponse>()
-
-
-
         persist(refreshedTokenResponse)
-        return refreshedTokenResponse!!.accessToken
+
+        if (refreshedTokenResponse == null) {
+            throw Forbidden("access_denied", "No token response found")
+        } else {
+            return refreshedTokenResponse.accessToken
+        }
 
     }
 
@@ -283,6 +273,8 @@ class Login(
         _persistedRefreshToken = tokenResponse?.refreshToken
     }
     private fun getPersistedToken(): String? {
+
+        println("kommer till getPersistedToken")
         return _persistedRefreshToken
     }
 
