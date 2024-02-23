@@ -14,7 +14,6 @@ import java.util.UUID
 import org.springframework.jdbc.core.query
 import org.springframework.web.bind.annotation.*
 import org.springframework.data.annotation.Id
-import org.springframework.data.relational.core.mapping.Table
 import org.springframework.data.repository.CrudRepository
 import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
@@ -27,26 +26,9 @@ import org.springframework.web.server.session.WebSessionIdResolver
 import java.net.URL
 
 
-
 // Från Application.kt
 @SpringBootApplication
 class TrupalApplication {
-    @Bean
-    fun webSessionIdResolver(
-        @Value("\${app.domain}")
-        publicDomain: String
-    ): WebSessionIdResolver {
-        return CookieWebSessionIdResolver().apply {
-            addCookieInitializer {
-                // Disable secure cookies if on http or the session cookie will not be saved
-                // Note: A production service in Truid cannot use a http redirect, for test only
-                if (URL(publicDomain).protocol != "http") {
-                    it.secure(true)
-                }
-                it.sameSite("Lax")
-            }
-        }
-    }
 
     @Bean
     fun restTemplate(): RestTemplate {

@@ -1,0 +1,28 @@
+
+
+
+
+
+//        Jag tror jag vill göra detta som en app,
+//        att jag liksom går in i den istället för en brower
+
+//        User 1
+//        Confirm signup
+//        Complete signup
+//          Backend hämtar tokens, sparar som cookies
+//          Redirect:ar användaren till P2P
+//        Initiate P2P
+//          Backend hämtar användarinfo
+                -Definiera vilken användarinfo som behövs
+//          Backend skapar sessionsID (P2P session)
+                -
+//        Returnerar länk med sessionsID
+//        Skapar "väntsida" där användaren kan se ifall user 2 har klickat på länken och/eller signerat
+//        Användare skickar länk med sessionsID
+//        Användare använder polling mot backend med sessionsID (behöver ha mer säkerhet, i anslutning till backend t.ex)
+//            När user 2 klickar på länken så får användaren tillbaka state/cookies från Truid
+//        User 2
+//        Användare klickar på länk
+//        Användare gör get(!)/post mot endpoint som jag bygger, som tar sessionsID och kollar om det finns i min backend/Truid (gammal,giltig?,
+//        i övrigt gör den som confirm-signup))
+//        Användare får tillbaka state/cookies från Truid

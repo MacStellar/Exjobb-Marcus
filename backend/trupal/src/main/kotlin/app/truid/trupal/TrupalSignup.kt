@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper
 import jakarta.servlet.http.HttpServletRequest
 import jakarta.servlet.http.HttpServletResponse
 import jakarta.servlet.http.HttpServletResponse.*
+import jakarta.servlet.http.HttpSession
 import jakarta.ws.rs.ForbiddenException
 import org.apache.http.client.utils.URIBuilder
 import org.springframework.beans.factory.annotation.Value
@@ -19,6 +20,7 @@ import java.net.URI
 import org.springframework.http.*
 import org.springframework.http.MediaType.*
 import org.springframework.web.bind.annotation.*
+import java.time.Instant
 
 
 interface MessageRepository : CrudRepository<Message, String>
@@ -28,7 +30,7 @@ data class Message(@Id var id: String?, val text: String?)
 
 
 @RestController
-class Login(
+class TrupalSignup(
 
     //    Changed so it loads from a file in .gitignore
     @Value("\${oauth2.clientId}")
@@ -56,12 +58,19 @@ class Login(
     @Value("\${web.signup.failure}")
     val webFailure: URI,
 
+    @Value("\${web.peer-to-peer}")
+    val peerToPeer: URI,
+
     val restTemplate: RestTemplate,
 
-    val db: MessageRepository
+    val db: MessageRepository,
+
+    val userTokenDB: UserTokenRepository
 ) {
     // This variable acts as our persistence in this example
     private var _persistedRefreshToken: String? = null
+
+//    http://localhost:8080/truid/v1/confirm-signup
 
     @GetMapping("/truid/v1/confirm-signup")
     fun test(
@@ -71,20 +80,20 @@ class Login(
         @RequestHeader("X-Requested-With") xRequestedWith: String?,
     ) {
         val session = request.session
-        clearPersistence()
+
+        clearPersistence(session.id)
 
         val truidSignupUrl = URIBuilder(truidSignupEndpoint)
             .addParameter("response_type", "code")
             .addParameter("client_id", clientId)
-            .addParameter("scope", "truid.app/data-point/email")
+            .addParameter("scope", "truid.app/data-point/email truid.app/data-point/birthdate")
             .addParameter("redirect_uri", redirectUri)
             .addParameter("state", createOauth2State(session))
             .addParameter("code_challenge", createOauth2CodeChallenge(session))
             .addParameter("code_challenge_method", "S256")
             .build()
 
-//        println("cookie: ${request.cookies}")
-
+        request.session.setAttribute("oauth2-state", createOauth2State(session))
 //        Setting redirect link
         response.setHeader("Location", truidSignupUrl.toString())
 
@@ -97,10 +106,11 @@ class Login(
             // Return a 302 response in case of browser redirect
             response.status = SC_FOUND
         }
+
     }
 
-    @GetMapping(path=["/truid/v1/complete-signup"],
-//                produces = [APPLICATION_JSON_VALUE, TEXT_HTML_VALUE]
+    @GetMapping(
+        path = ["/truid/v1/complete-signup"],
     )
     fun completeSignup(
         @RequestParam("code") code: String?,
@@ -112,18 +122,12 @@ class Login(
         val session = request.session
         val presentation: ResponseEntity<PresentationResponse>
 
-
-
-        println("code, state, error: $code, $state, $error")
-
         if (error != null) {
             throw Forbidden(error, "There was an authorization error")
-        }
-        else if (!verifyOauth2State(session, state)) {
+        } else if (!verifyOauth2State(session, state)) {
             throw Forbidden("access_denied", "State does not match the expected value")
         } else {
             try {
-                println("kommer hit 1---")
 
                 val body = LinkedMultiValueMap<String, String>()
                 body.add("grant_type", "authorization_code")
@@ -138,51 +142,30 @@ class Login(
                 val tokenResponse =
                     restTemplate.postForEntity<TokenResponse>(truidTokenEndpoint, body, TokenResponse::class)
 
-                println("kommer hit 2---")
-//                Create entity with header including access token
-                val header = HttpHeaders()
-                header.contentType = APPLICATION_JSON
-                header.setBearerAuth(tokenResponse.body!!.accessToken)
-                val entity = HttpEntity<String>(header)
-
-
-//                Build presentationUri
-                val getPresentationUri = URIBuilder(truidPresentationEndpoint)
-                    .addParameter("claims", "truid.app/claim/email/v1")
-                    .build()
-
-                println("kommer hit 3---")
-//                Get presentation with access token
-                presentation =
-                    restTemplate.exchange(getPresentationUri, HttpMethod.GET, entity, PresentationResponse::class.java)
-
-
+                val cookieId = request.session.id
 
 //                Persist the refresh token
-                persist(tokenResponse.body)
+                persist(tokenResponse.body, cookieId)
             } catch (e: ForbiddenException) {
                 throw Forbidden("access_denied", e.message)
             }
 
-            if (request.getHeader(HttpHeaders.ACCEPT).contains(TEXT_HTML_VALUE)) {
-                // Redirect to success page in the webapp flow
-                response.setHeader("Location", webSuccess.toString())
+            if (request.session.getAttribute("sessionP2P") != null) {
+                val sessionP2P = request.session.getAttribute("sessionP2P") as String
+                val redirectP2P = URIBuilder(peerToPeer).addParameter("session", sessionP2P).build()
+                response.setHeader("Location", redirectP2P.toString())
                 response.status = SC_FOUND
-
             } else {
-                // Return a 200 response in case of an AJAX request
-                response.status = SC_OK
-                println("mobilversion")
+                if (request.getHeader(HttpHeaders.ACCEPT).contains(TEXT_HTML_VALUE)) {
+                    // Redirect to success page in the webapp flow
+                    response.setHeader("Location", webSuccess.toString())
+                    response.status = SC_FOUND
+
+                } else {
+                    // Return a 200 response in case of an AJAX request
+                    response.status = SC_OK
+                }
             }
-
-
-
-//            Get the email from presentation body and create a database entry
-            val email = presentation.body?.claims?.get(0)?.value
-            val emailMessage = Message(id = null, text = email)
-
-            //Get the email from the presentation and save it to the database
-            saveToDatabase(emailMessage)
 
 
 
@@ -191,19 +174,24 @@ class Login(
         }
     }
 
+//    http://localhost:8080/truid/v1/presentation
+//    http://localhost:8080/peer-to-peer?session=73399f28-a94b-45bd-aec5-8cbcb4cddfb9
+
     @GetMapping(
         path = ["/truid/v1/presentation"],
         produces = [APPLICATION_JSON_VALUE]
     )
-    fun getPresentation(): String? {
+    fun getPresentation(
+        request: HttpServletRequest,
+    ): String? {
 
+        val cookieId = request.session.id
 
 //        Get the access token
-        val accessToken = refreshToken()
-
+        val accessToken = refreshToken(cookieId)
 
         val getPresentationUri = URIBuilder(truidPresentationEndpoint)
-            .addParameter("claims", "truid.app/claim/email/v1")
+            .addParameter("claims", "truid.app/claim/email/v1,truid.app/claim/birthdate/v1")
             .build()
 
 //        Create entity with header including access token
@@ -212,12 +200,14 @@ class Login(
         header.setBearerAuth(accessToken)
         val entity = HttpEntity<String>(header)
 
+        val presentationResponse =
+            restTemplate.exchange(getPresentationUri, HttpMethod.GET, entity, PresentationResponse::class.java)
 
-        val presentationResponse = restTemplate.exchange(getPresentationUri, HttpMethod.GET, entity, PresentationResponse::class.java)
-        println("presentationResponse statuscode: ${presentationResponse.statusCode}")
-
-
-        return presentationResponse.body?.claims?.get(0)?.value
+        return "Email: " + "${presentationResponse.body?.claims?.get(0)?.value}" + " and birthdate: " + "${
+            presentationResponse.body?.claims?.get(
+                1
+            )?.value
+        }"
     }
 
     @ExceptionHandler(Forbidden::class)
@@ -242,20 +232,20 @@ class Login(
         }
     }
 
-    private fun refreshToken(): String {
+    fun refreshToken(cookieId: String?): String {
 
-        val refreshToken = getPersistedToken() ?: throw Forbidden("access_denied", "No refresh_token found")
+        val refreshToken = getPersistedToken(cookieId) ?: throw Forbidden("access_denied", "No refresh_token found")
 
-        println("kommer förbi getPersistedToken")
         val body = LinkedMultiValueMap<String, String>()
         body.add("grant_type", "refresh_token")
         body.add("refresh_token", refreshToken)
         body.add("client_id", clientId)
         body.add("client_secret", clientSecret)
 
-        val refreshedTokenResponse = restTemplate.postForEntity<TokenResponse>(truidTokenEndpoint, body, TokenResponse::class).body
+        val refreshedTokenResponse =
+            restTemplate.postForEntity<TokenResponse>(truidTokenEndpoint, body, TokenResponse::class).body
 
-        persist(refreshedTokenResponse)
+        persist(refreshedTokenResponse, cookieId)
 
         if (refreshedTokenResponse == null) {
             throw Forbidden("access_denied", "No token response found")
@@ -265,21 +255,49 @@ class Login(
 
     }
 
-    private fun clearPersistence() {
-        _persistedRefreshToken = null
+    private fun clearPersistence(cookieId: String?) {
+//        _persistedRefreshToken = null
+
+        userTokenDB.deleteUserTokenByCookie(cookieId)
     }
 
-    private fun persist(tokenResponse: TokenResponse?) {
-        _persistedRefreshToken = tokenResponse?.refreshToken
-    }
-    private fun getPersistedToken(): String? {
+    private fun persist(tokenResponse: TokenResponse?, cookieId: String?) {
+//        _persistedRefreshToken = tokenResponse?.refreshToken
 
-        println("kommer till getPersistedToken")
-        return _persistedRefreshToken
+        println("kommer in i persist")
+
+        userTokenDB.deleteUserTokenByCookie(cookieId)
+
+        println("kommer in i persist 2")
+
+        userTokenDB.save(
+            UserToken(
+                null,
+                cookieId,
+                "test_user_persist",
+                tokenResponse?.refreshToken,
+                Instant.now()
+            )
+        )
+
+        println("kommer in i persist 3")
+    }
+
+    private fun getPersistedToken(cookieId: String?): String? {
+
+        println("kommer in i getPersistedToken")
+
+        val userToken = userTokenDB.getUserTokenByCookie(cookieId)
+
+        println("kommer in i getPersistedToken 2")
+        println("refreshToken: ${userToken?.refreshToken}")
+
+        return userToken?.refreshToken
+
+//        return _persistedRefreshToken
     }
 
     fun saveToDatabase(message: Message) {
-        println("Saving to database: $message")
         db.save(message)
     }
 

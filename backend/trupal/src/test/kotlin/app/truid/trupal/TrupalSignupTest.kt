@@ -17,10 +17,8 @@ import org.springframework.boot.test.context.SpringBootTest.WebEnvironment.RANDO
 import org.springframework.http.HttpHeaders
 import org.springframework.http.MediaType.*
 import org.springframework.http.RequestEntity
-import org.springframework.http.ResponseEntity
 import java.net.HttpCookie
 import org.apache.http.client.utils.URIBuilder
-import org.springframework.http.MediaType
 import wiremock.com.fasterxml.jackson.databind.JsonNode
 
 //        testRestTemplate.exchange(
@@ -69,7 +67,6 @@ class TrupalSignupTest {
 //        Checks whether the location header for the redirect is set correctly
             val location = response.headers.location!!
             assertEquals("/oauth2/v1/authorize/confirm-signup", location.path)
-            println(location.query)
 
 //        Checks whether the state query parameters are set correctly
             val queryParameters = location.query
@@ -99,6 +96,8 @@ class TrupalSignupTest {
 
 //            Checks whether the site redirects user
             assertEquals(302, res.statusCode.value())
+
+            println("res.session.get")
 
 //            Checks whether the cookie is received and is set to httpOnly
             val cookie = HttpCookie.parse(res.headers[HttpHeaders.SET_COOKIE]?.firstOrNull()).single()
@@ -138,7 +137,7 @@ class TrupalSignupTest {
                         WireMock.aResponse()
                             .withStatus(200)
                             .withHeader(HttpHeaders.CONTENT_TYPE, APPLICATION_JSON_VALUE)
-                            .withBody("{\"refresh_token\":\"refresh-token\",\"access_token\":\"access-token\",\"expires_in\":3600,\"token_type\":\"token-type\",\"scope\":\"truid.app/data-point/email\"}")
+                            .withBody("{\"refresh_token\":\"refresh-token\",\"access_token\":\"access-token\",\"expires_in\":3600,\"token_type\":\"token-type\",\"scope\":\"truid.app/data-point/email truid.app/data-point/birthdate\"}")
                     )
             )
         }
@@ -166,6 +165,10 @@ class TrupalSignupTest {
                     PresentationResponseClaims(
                         type = "truid.app/claim/email/v1",
                         value = "email@example.com"
+                    ),
+                    PresentationResponseClaims(
+                        type = "truid.app/claim/bithdate/v1",
+                        value = "1982-11-23"
                     )
                 )
             )
@@ -174,14 +177,15 @@ class TrupalSignupTest {
 
 //            The mock response from Truid
             WireMock.stubFor(
-                WireMock.get(WireMock.urlEqualTo("/exchange/v1/presentation?claims=truid.app%2Fclaim%2Femail%2Fv1")).willReturn(
-                    WireMock.aResponse()
-                        .withHeader(HttpHeaders.CONTENT_TYPE, APPLICATION_JSON_VALUE)
-                        .withStatus(200)
-                        .withJsonBody(
-                            presentationResponseJsonNode
-                        )
-                )
+                WireMock.get(WireMock.urlEqualTo("/exchange/v1/presentation?claims=truid.app%2Fclaim%2Femail%2Fv1%2Ctruid.app%2Fclaim%2Fbirthdate%2Fv1"))
+                    .willReturn(
+                        WireMock.aResponse()
+                            .withHeader(HttpHeaders.CONTENT_TYPE, APPLICATION_JSON_VALUE)
+                            .withStatus(200)
+                            .withJsonBody(
+                                presentationResponseJsonNode
+                            )
+                    )
             )
 
 //            Calls the client backend endpoint and gets truid mock response in return
@@ -191,6 +195,7 @@ class TrupalSignupTest {
                     .build(),
                 Void::class.java
             )
+
 
 //            Checks if the response is 200
             assertEquals(200, response.statusCode.value(), "Status code is not 200")
@@ -289,6 +294,10 @@ class TrupalSignupTest {
                     PresentationResponseClaims(
                         type = "truid.app/claim/email/v1",
                         value = "email@example.com"
+                    ),
+                    PresentationResponseClaims(
+                        type = "truid.app/claim/bithdate/v1",
+                        value = "1982-11-23"
                     )
                 )
             )
@@ -296,7 +305,7 @@ class TrupalSignupTest {
             val presentationResponseJsonNode: JsonNode = ObjectMapper().readTree(presentationResponseString)
 
             WireMock.stubFor(
-                WireMock.get("/exchange/v1/presentation?claims=truid.app%2Fclaim%2Femail%2Fv1").willReturn(
+                WireMock.get("/exchange/v1/presentation?claims=truid.app%2Fclaim%2Femail%2Fv1%2Ctruid.app%2Fclaim%2Fbirthdate%2Fv1").willReturn(
                     WireMock.aResponse()
                         .withHeader(HttpHeaders.CONTENT_TYPE, APPLICATION_JSON_VALUE)
                         .withStatus(200)
@@ -323,7 +332,7 @@ class TrupalSignupTest {
 //
 ////            The mock response from Truid
 //            WireMock.stubFor(
-//                WireMock.get(WireMock.urlEqualTo("/exchange/v1/presentation?claims=truid.app%2Fclaim%2Femail%2Fv1")).willReturn(
+//                WireMock.get(WireMock.urlEqualTo("/exchange/v1/presentation?claims=truid.app%2Fclaim%2Femail%2Fv1%2Ctruid.app%2Fclaim%2Fbirthdate%2Fv1")).willReturn(
 //                    WireMock.aResponse()
 //                        .withHeader(HttpHeaders.CONTENT_TYPE, APPLICATION_JSON_VALUE)
 //                        .withStatus(200)
@@ -425,13 +434,15 @@ class TrupalSignupTest {
 //                val presentationResponseJsonNode: JsonNode = ObjectMapper().readTree(presentationResponseString)
 //
 //                WireMock.stubFor(
-//                    WireMock.get("/exchange/v1/presentation?claims=truid.app%2Fclaim%2Femail%2Fv1").willReturn(
+//                    WireMock.get("/exchange/v1/presentation?claims=truid.app%2Fclaim%2Femail%2Fv1%2Ctruid.app%2Fclaim%2Fbirthdate%2Fv1").willReturn(
 //                        WireMock.aResponse()
 //                            .withHeader(HttpHeaders.CONTENT_TYPE, APPLICATION_JSON_VALUE)
 //                            .withStatus(200)
 //                            .withJsonBody(presentationResponseJsonNode)
 //                    )
 //                )
+
+
 
                 val response = testRestTemplate.exchange(
                     RequestEntity.get("/truid/v1/complete-signup?code=1234&state=$state")
@@ -444,13 +455,15 @@ class TrupalSignupTest {
                 val url = URIBuilder(response.headers[HttpHeaders.LOCATION]?.firstOrNull())
                 assertEquals(302, response.statusCode.value(), "Status code is not 302")
                 assertEquals("/truid/v1/presentation", url.path)
+
+                println("hela before each körs klart med assertions giltiga")
             }
 
             @Test
             fun `It should get presentation data with the access token`() {
 
                 val response = testRestTemplate.exchange(
-                    RequestEntity.get("/truid/v1/presentation?claims=truid.app%2Fclaim%2Femail%2Fv1")
+                    RequestEntity.get("/truid/v1/presentation?claims=truid.app%2Fclaim%2Femail%2Fv1%2Ctruid.app%2Fclaim%2Fbirthdate%2Fv1")
                         .header(HttpHeaders.COOKIE, cookie.toString())
 //                        .accept(TEXT_HTML)
                         .build(),
@@ -458,49 +471,12 @@ class TrupalSignupTest {
                 )
 
                 assertEquals(200, response.statusCode.value(), "Status code is not 200")
-                assertEquals("email@example.com", response.body)
+                assertEquals("Email: email@example.com and birthdate: 1982-11-23", response.body)
 
             }
         }
 
-
-
-    }
-
-
-
-
-
-
-
-
-
-
-
-
-
-    @Test
-    fun `P2P test`() {
-//        Jag tror jag vill göra detta som en app,
-//        att jag liksom går in i den istället för en brower
-
-//        User 1
-//        Confirm signup
-//        Complete signup
-//          Backend hämtar tokens
-//          Backend hämtar användarinfo
-//          Backend skapar sessionsID (P2P session)
-//        Returnerar länk med sessionsID
-//        Skapar "väntsida" där användaren kan se ifall user 2 har klickat på länken och/eller signerat
-//        Användare skickar länk med sessionsID
-//        Användare använder polling mot backend med sessionsID (behöver ha mer säkerhet, i anslutning till backend t.ex)
-//            När user 2 klickar på länken så får användaren tillbaka state/cookies från Truid
-//        User 2
-//        Användare klickar på länk
-//        Användare (get(!)/post mot endpoint som jag bygger som tar sessionsID och kollar om det finns i min backend/Truid (gammal,giltig?,
-//        i övrigt gör den som confirm-signup)
-//        Användare får tillbaka state/cookies från Truid
-
     }
 
 }
+
