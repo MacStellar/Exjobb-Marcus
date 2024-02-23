@@ -264,11 +264,7 @@ class TrupalSignup(
     private fun persist(tokenResponse: TokenResponse?, cookieId: String?) {
 //        _persistedRefreshToken = tokenResponse?.refreshToken
 
-        println("kommer in i persist")
-
         userTokenDB.deleteUserTokenByCookie(cookieId)
-
-        println("kommer in i persist 2")
 
         userTokenDB.save(
             UserToken(
@@ -279,17 +275,12 @@ class TrupalSignup(
                 Instant.now()
             )
         )
-
-        println("kommer in i persist 3")
     }
 
     private fun getPersistedToken(cookieId: String?): String? {
 
-        println("kommer in i getPersistedToken")
-
         val userToken = userTokenDB.getUserTokenByCookie(cookieId)
 
-        println("kommer in i getPersistedToken 2")
         println("refreshToken: ${userToken?.refreshToken}")
 
         return userToken?.refreshToken
