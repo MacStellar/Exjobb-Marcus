@@ -37,61 +37,72 @@ class TrupalPeerToPeer(
             return dbTestEntrySession.id!!
 
         }
-//        else if ("more than 2 in the session") { "unauthorized" }
 
         if (sessionDB.existsSessionById(sessionP2P)) {
+            // This is where a user tries to join a session
             if (userSessionDB.existsUserSessionsBySessionIdAndCookieId(sessionP2P, request.session.id)) {
-                // Session exist and user has access
+                // This is where a user goes if he/she has access through a cookie
 
-//            Hämtar alla userSessions från databasen som är kopplade till ett session_id
+                // Downloads all userSessions from the database that are connected to the sessionP2P
                 val foundUserSessionsList = userSessionDB.getUserSessionsBySessionId(sessionP2P)
                 var userInfoPrintOut = ""
-                if (foundUserSessionsList != null) {
-                    for (userSession in foundUserSessionsList) {
-                        userInfoPrintOut = userInfoPrintOut + userSession.userInfo
-                    }
-                    response.status = HttpServletResponse.SC_OK
+                var index = 0
 
-                    return userInfoPrintOut
-
-                    // If the session exists, redirect to the P2P chat
-                    // *skriv kod för detta här*
+                for (userSession in foundUserSessionsList!!) {
+                    index++
+                    userInfoPrintOut = userInfoPrintOut + "<h2> User${index}: </h2> <h3> ${userSession.userInfo} </h3>"
                 }
-                return "null"
+                response.status = HttpServletResponse.SC_OK
+
+                return userInfoPrintOut
+
+                // Here I'm going to add the code for redirecting to the P2P chat later
+
             } else {
-//            Detta är vart en ny användare kommer in och kopplar sin cookie till en session
+                //This is where a new user comes in and connects their cookie to a session
                 val userInfo: String?
 
-                // 1. Försök hämta Truid data med access token
-                try {
-                    userInfo = trupalSignup.getPresentation(request)
-                } catch (e: Forbidden) {
-                    // 2. Om det inte går, redirect till confirm-signup med session id sparad i session för cookie på server side
+                // Block user from entering if there already are 2 in session
+                if ((userSessionDB.getUserSessionsBySessionId(sessionP2P)?.size ?: 0) >= 2) {
+                    response.status = 403
+                    return "Session is full"
+                } else {
+                    // 1. Tries to get Truid data with token
+                    try {
+                        userInfo = trupalSignup.getPresentation(request)
+                    } catch (e: Forbidden) {
+                        // 2. If it doesn't work, redirect to confirm-signup with p2p session id saved in session for cookie on server side
 
-                    request.session.setAttribute("sessionP2P", "$sessionP2P")
+                        request.session.setAttribute("sessionP2P", "$sessionP2P")
+                        response.status = 302
+                        response.setHeader("Location", "http://localhost:8080/truid/v1/confirm-signup")
+                        return "null"
+                    }
+
+                    // 3. If it works, add the data and cookie session to the database
+                    try {
+                        userSessionDB.save(
+                            UserSession(
+                                null,
+                                sessionP2P,
+                                request.session.id,
+                                "test_user_id",
+                                userInfo,
+                                Instant.now()
+                            )
+                        )
+                    } catch (e: Exception) {
+                        response.status = 500
+                        return "Error: Could not join session. Either the session is full or something is wrong with the database"
+                    }
+
                     response.status = 302
-                    response.setHeader("Location", "http://localhost:8080/truid/v1/confirm-signup")
-                    return "null"
+                    response.setHeader("Location", "http://localhost:8080/peer-to-peer?session=$sessionP2P")
+
+                    return "Session does exist in the database but your cookie is not connected, redirecting to confirm-signup"
+
                 }
 
-                // 3. Om det går, lägg till datan och cookie session i databas
-
-                userSessionDB.save(
-                    UserSession(
-                        null,
-                        sessionP2P,
-                        request.session.id,
-                        "test_user_id",
-                        userInfo,
-                        Instant.now()
-                    )
-                )
-
-
-                response.status = 302
-                response.setHeader("Location", "http://localhost:8080/peer-to-peer?session=$sessionP2P")
-
-                return "Session does exist in the database but your cookie is not connected, redirecting to confirm-signup"
 
             }
 

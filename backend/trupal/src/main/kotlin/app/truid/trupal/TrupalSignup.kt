@@ -1,16 +1,11 @@
 package app.truid.trupal
 
-import com.fasterxml.jackson.databind.ObjectMapper
 import jakarta.servlet.http.HttpServletRequest
 import jakarta.servlet.http.HttpServletResponse
 import jakarta.servlet.http.HttpServletResponse.*
-import jakarta.servlet.http.HttpSession
 import jakarta.ws.rs.ForbiddenException
 import org.apache.http.client.utils.URIBuilder
 import org.springframework.beans.factory.annotation.Value
-import org.springframework.data.annotation.Id
-import org.springframework.data.relational.core.mapping.Table
-import org.springframework.data.repository.CrudRepository
 import org.springframework.http.HttpEntity
 import org.springframework.http.HttpMethod
 import org.springframework.util.LinkedMultiValueMap
@@ -21,12 +16,6 @@ import org.springframework.http.*
 import org.springframework.http.MediaType.*
 import org.springframework.web.bind.annotation.*
 import java.time.Instant
-
-
-interface MessageRepository : CrudRepository<Message, String>
-
-@Table("messages")
-data class Message(@Id var id: String?, val text: String?)
 
 
 @RestController
@@ -62,8 +51,6 @@ class TrupalSignup(
     val peerToPeer: URI,
 
     val restTemplate: RestTemplate,
-
-    val db: MessageRepository,
 
     val userTokenDB: UserTokenRepository
 ) {
@@ -174,9 +161,6 @@ class TrupalSignup(
         }
     }
 
-//    http://localhost:8080/truid/v1/presentation
-//    http://localhost:8080/peer-to-peer?session=73399f28-a94b-45bd-aec5-8cbcb4cddfb9
-
     @GetMapping(
         path = ["/truid/v1/presentation"],
         produces = [APPLICATION_JSON_VALUE]
@@ -286,10 +270,6 @@ class TrupalSignup(
         return userToken?.refreshToken
 
 //        return _persistedRefreshToken
-    }
-
-    fun saveToDatabase(message: Message) {
-        db.save(message)
     }
 
 }

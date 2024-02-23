@@ -3,26 +3,32 @@
 
 
 
-//        Jag tror jag vill göra detta som en app,
-//        att jag liksom går in i den istället för en brower
+//      Jag tror jag vill göra detta som en app,
+//      att jag liksom går in i den istället för en brower
 
-//        User 1
+//      User1
+//        P2P
+//          Backend skapar p2p-sessionsID (P2P session)
 //        Confirm signup
 //        Complete signup
-//          Backend hämtar tokens, sparar som cookies
+//          Backend hämtar tokens, sparar som cookies (sparade i databas mappat till cookie session istället)
 //          Redirect:ar användaren till P2P
-//        Initiate P2P
+//        P2P
 //          Backend hämtar användarinfo
-                -Definiera vilken användarinfo som behövs
-//          Backend skapar sessionsID (P2P session)
-                -
-//        Returnerar länk med sessionsID
-//        Skapar "väntsida" där användaren kan se ifall user 2 har klickat på länken och/eller signerat
-//        Användare skickar länk med sessionsID
-//        Användare använder polling mot backend med sessionsID (behöver ha mer säkerhet, i anslutning till backend t.ex)
-//            När user 2 klickar på länken så får användaren tillbaka state/cookies från Truid
+                -Definiera vilken användarinfo som behövs (inte klart än)
+            Hämtar användardata från getPresentation och laddar upp i databasen
+                -Redirect:ar användaren till P2P igen
+                -Nästa gång dem går in i P2P så får dem access till användarinfo och länk med p2p-sessionsID
+//          Visar användarinfo och länk med p2p-sessionsID att skicka till user2
+
+            -- Inte gjort polling ännu --
+
+//          Visar "väntsida" där användaren kan se ifall user 2 har klickat på länken och/eller signerat
+//          User1 skickar länk med p2p-sessionsID till user2
+//          Sidan kör polling mot backend med p2p-sessionsID (behöver ha mer säkerhet, i anslutning till backend t.ex)
+//            När user 2 klickar på länken så får användaren tillbaka (?state/cookies från Truid? eller kanske bättre: båda användarnas delade data)
 //        User 2
-//        Användare klickar på länk
-//        Användare gör get(!)/post mot endpoint som jag bygger, som tar sessionsID och kollar om det finns i min backend/Truid (gammal,giltig?,
-//        i övrigt gör den som confirm-signup))
-//        Användare får tillbaka state/cookies från Truid
+//          Användare klickar på länk
+//          Användare gör get(!)/post mot peer-to-peer endpoint
+                -Går igenom samma process som user1
+//          Användare kommer till pollingsidan där bådas information nu kan visas

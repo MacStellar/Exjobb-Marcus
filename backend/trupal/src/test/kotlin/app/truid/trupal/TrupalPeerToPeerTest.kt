@@ -5,50 +5,22 @@ import org.apache.http.client.utils.URIBuilder
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.springframework.beans.factory.annotation.Autowired
-import org.springframework.beans.factory.annotation.Value
 import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.boot.test.web.client.TestRestTemplate
-import org.springframework.boot.test.web.client.getForEntity
 import org.springframework.cloud.contract.wiremock.AutoConfigureWireMock
 import org.springframework.http.HttpHeaders
 import org.springframework.http.MediaType
 import org.springframework.http.RequestEntity
 import org.springframework.test.context.ActiveProfiles
-import com.fasterxml.jackson.databind.JsonNode
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.github.tomakehurst.wiremock.client.ResponseDefinitionBuilder
 import org.junit.jupiter.api.*
 import java.net.HttpCookie
-import java.time.Instant
-
-
-//        User 1
-//        Confirm signup
-//        Complete signup
-//          Backend hämtar tokens
-//          Backend hämtar användarinfo
-//          Backend skapar sessionsID (P2P session)
-//        Användare skickar länk med sessionsID
-//        Användare använder polling mot backend med sessionsID (behöver ha mer säkerhet, i anslutning till backend t.ex)
-//        User 2
-//        Användare klickar på länk
-//        Användare (get(!)/post mot endpoint som jag bygger som tar sessionsID och kollar om det finns i Truid (gammal,giltig?),
-//        i övrigt gör den som confirm-signup)
-//        Användare får tillbaka state/cookies från Truid
-
-//        Confirm signup
-
 
 @AutoConfigureWireMock(port = 0)
 @ActiveProfiles("test")
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 class TrupalP2PSignup {
-
-    @Value("\${oauth2.truid.signup-endpoint}")
-    lateinit var truidSignupEndpoint: String
-
-    @Value("\${oauth2.truid.token-endpoint}")
-    lateinit var truidTokenEndpoint: String
 
     @Autowired
     lateinit var testRestTemplate: TestRestTemplate
@@ -376,7 +348,10 @@ class TrupalP2PSignup {
                         )
 
                         assertEquals(200, response.statusCode.value())
-                        assertEquals("Email: user-1@example.com and birthdate: 1111-11-11Email: user-2@example.com and birthdate: 2222-22-22", response.body)
+                        assertEquals(
+                            "Email: user-1@example.com and birthdate: 1111-11-11Email: user-2@example.com and birthdate: 2222-22-22",
+                            response.body
+                        )
 
                     }
                 }
@@ -393,134 +368,3 @@ class TrupalP2PSignup {
             .withBody(ObjectMapper().writeValueAsString(body))
 
 }
-
-
-//        @BeforeEach
-//        fun `Setup mock Truid returning email and birthdate`() {
-////            Creates the response for the mock response from Truid
-//            val presentationResponse = PresentationResponse(
-//                sub = "1234567abcdefg",
-//                claims = listOf(
-//                    PresentationResponseClaims(
-//                        type = "truid.app/claim/email/v1",
-//                        value = "p2p-email@example.com"
-//                    ),
-//                    PresentationResponseClaims(
-//                        type = "truid.app/claim/birthdate/v1",
-//                        value = "1998-01-01"
-//                    )
-//                )
-//            )
-////            val presentationResponseString = ObjectMapper().writeValueAsString(presentationResponse)
-////            val presentationResponseJsonNode: JsonNode = ObjectMapper().readTree(presentationResponseString)
-////
-//
-////            The mock response from Truid
-//            WireMock.stubFor(
-//                WireMock.get(WireMock.urlEqualTo("/exchange/v1/presentation?claims=truid.app%2Fclaim%2Femail%2Fv1"))
-//                    .willReturn(
-//                        WireMock.aResponse()
-//                            .withHeader(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
-//                            .withStatus(200)
-//                            .withJsonBody(
-//                                presentationResponse
-//                            )
-//                    )
-//            )
-//        }
-
-//        @BeforeEach
-//        fun `Setup test session and test userSessions for both users`() {
-////            In order for this test to work, the database must be setup correctly
-//            val response = testRestTemplate.exchange(
-//                RequestEntity.get("/peer-to-peer")
-//                    .build(),
-//                String::class.java
-//            )
-//
-////            Checks whether the site redirects user
-//            assertTrue(302 == response.statusCode.value())
-//
-////            Checks whether the cookie is received and is set to httpOnly
-//            cookie = HttpCookie.parse(response.headers[HttpHeaders.SET_COOKIE]?.firstOrNull()).single()
-//            assertEquals(true, cookie.isHttpOnly)
-//
-////            Creates test user data
-//            val presentationResponseUserOne = PresentationResponse(
-//                sub = "1234567abcdefg",
-//                claims = listOf(
-//                    PresentationResponseClaims(
-//                        type = "truid.app/claim/email/v1",
-//                        value = "p2p-user-1@example.com"
-//                    ),
-//                    PresentationResponseClaims(
-//                        type = "truid.app/claim/birthdate/v1",
-//                        value = "0001-01-01"
-//                    )
-//                )
-//            )
-//            val presentationResponseUserTwo = PresentationResponse(
-//                sub = "1234567abcdefg",
-//                claims = listOf(
-//                    PresentationResponseClaims(
-//                        type = "truid.app/claim/email/v1",
-//                        value = "p2p-user-2@example.com"
-//                    ),
-//                    PresentationResponseClaims(
-//                        type = "truid.app/claim/birthdate/v1",
-//                        value = "0002-02-02"
-//                    )
-//                )
-//            )
-//            val presentationResponseJsonNodeOne: String = ObjectMapper().writeValueAsString(presentationResponseUserOne)
-//            val presentationResponseJsonNodeTwo: String = ObjectMapper().writeValueAsString(presentationResponseUserTwo)
-//
-//
-////            Plucks the P2P session id to database entry from the response returned by the backend
-//            testP2PSessionId = response.body!!
-//
-////            Saves the user sessions to the database
-//            usersessionDB.save(
-//                UserSession(
-//                    null,
-//                    testP2PSessionId,
-//                    cookie.value,
-//                    "test_user_id_1",
-//                    presentationResponseJsonNodeOne,
-//                    Instant.now()
-//                )
-//            )
-//            usersessionDB.save(
-//                UserSession(
-//                    null,
-//                    testP2PSessionId,
-//                    cookie.value,
-//                    "test_user_id_2",
-//                    presentationResponseJsonNodeTwo,
-//                    Instant.now()
-//                )
-//            )
-//
-//        }
-
-//        @AfterEach
-//        fun `Clean up database`() {
-//            println("Test session id: $testP2PSessionId")
-//            usersessionDB.deleteUserSessionBySessionId(testP2PSessionId)
-//            sessionDB.deleteById(testP2PSessionId)
-//        }
-
-//        @Test
-//        fun `It should return 200 and user data if valid P2P- and cookie session is provided`() {
-//            val response = testRestTemplate.exchange(
-//                RequestEntity.get("/peer-to-peer?session=$testP2PSessionId")
-//                    .header(HttpHeaders.COOKIE, cookie.toString())
-//                    .build(),
-//                String::class.java
-//            )
-//            assertEquals(200, response.statusCode.value())
-//            assertEquals(
-//                "User one data: {\"sub\":\"1234567abcdefg\",\"claims\":[{\"type\":\"truid.app/claim/email/v1\",\"value\":\"p2p-user-1@example.com\"},{\"type\":\"truid.app/claim/birthdate/v1\",\"value\":\"0001-01-01\"}]}, User two data: {\"sub\":\"1234567abcdefg\",\"claims\":[{\"type\":\"truid.app/claim/email/v1\",\"value\":\"p2p-user-2@example.com\"},{\"type\":\"truid.app/claim/birthdate/v1\",\"value\":\"0002-02-02\"}]}",
-//                response.body
-//            )
-//        }

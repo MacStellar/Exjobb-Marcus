@@ -10,16 +10,7 @@ CREATE TABLE interactiontest
     interaction jsonb     NOT NULL
 );
 
-
 --changeset marcusschon:interaction.2
---precondition-sql-check expectedResult:0 SELECT COUNT(to_regclass('public.messages'));
-CREATE TABLE messages
-(
-    id   VARCHAR(60) DEFAULT uuid_generate_v4() PRIMARY KEY,
-    text VARCHAR NOT NULL
-);
-
---changeset marcusschon:interaction.3
 --precondition-sql-check expectedResult:0 SELECT COUNT(to_regclass('public.session'));
 CREATE TABLE session
 (
@@ -35,7 +26,7 @@ CREATE TABLE session
 --          WHERE c.session_p2p = combinedusersinfo.session_p2p) <= 5
 --         );
 
---changeset marcusschon:interaction.4
+--changeset marcusschon:interaction.3
 --precondition-sql-check expectedResult:0 SELECT COUNT(to_regclass('public.userSession'));
 CREATE TABLE user_session
 (
@@ -47,7 +38,15 @@ CREATE TABLE user_session
     created    TIMESTAMP NOT NULL
 );
 
---changeset marcusschon:interaction.5
+
+
+-- CREATE TRIGGER check_user_session_full
+--     BEFORE INSERT
+--     ON user_session
+--     FOR EACH ROW
+--     EXECUTE FUNCTION user_session_full();
+
+--changeset marcusschon:interaction.4
 --precondition-sql-check expectedResult:0 SELECT COUNT(to_regclass('public.userTokens'));
 CREATE TABLE user_token
 (
@@ -57,3 +56,4 @@ CREATE TABLE user_token
     refresh_token VARCHAR   NOT NULL,
     created       TIMESTAMP NOT NULL
 );
+
