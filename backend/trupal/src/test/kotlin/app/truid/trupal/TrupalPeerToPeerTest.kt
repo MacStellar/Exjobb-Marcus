@@ -215,7 +215,7 @@ class TrupalP2PSignup {
                 )
 
                 assertEquals(200, response.statusCode.value())
-                assertEquals("Email: user-1@example.com and birthdate: 1111-11-11", response.body)
+                assertEquals("<h2> User1: </h2> <h3> Email: user-1@example.com and birthdate: 1111-11-11 </h3>", response.body)
 
             }
 
@@ -237,7 +237,6 @@ class TrupalP2PSignup {
                     assertTrue(302 == response.statusCode.value())
                 }
 
-                // För att få denna att fungera måste jag ha en databas som håller koll på tokens för olika användare
                 @Test
                 fun `It should redirect user 2 to confirm-signup if trying to access existing P2P session before authenticating`() {
                     val response = testRestTemplate.exchange(
@@ -349,19 +348,14 @@ class TrupalP2PSignup {
 
                         assertEquals(200, response.statusCode.value())
                         assertEquals(
-                            "Email: user-1@example.com and birthdate: 1111-11-11Email: user-2@example.com and birthdate: 2222-22-22",
+                            "<h2> User1: </h2> <h3> Email: user-1@example.com and birthdate: 1111-11-11 </h3><h2> User2: </h2> <h3> Email: user-2@example.com and birthdate: 2222-22-22 </h3>",
                             response.body
                         )
-
                     }
                 }
-
-
             }
         }
-
     }
-
 
     fun ResponseDefinitionBuilder.withJsonBody(body: Any): ResponseDefinitionBuilder =
         this.withHeader(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)

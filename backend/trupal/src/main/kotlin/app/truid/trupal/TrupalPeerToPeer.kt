@@ -24,7 +24,8 @@ class TrupalPeerToPeer(
 
 
         if (sessionP2P == null) {
-//        Sparar en session till databasen
+
+            // Saves a session to the database
             val testEntrySession = Session(null, Instant.now())
             val dbTestEntrySession = sessionDB.save(testEntrySession)
 
@@ -50,7 +51,7 @@ class TrupalPeerToPeer(
 
                 for (userSession in foundUserSessionsList!!) {
                     index++
-                    userInfoPrintOut = userInfoPrintOut + "<h2> User${index}: </h2> <h3> ${userSession.userInfo} </h3>"
+                    userInfoPrintOut += "<h2> User${index}: </h2> <h3> ${userSession.userInfo} </h3>"
                 }
                 response.status = HttpServletResponse.SC_OK
 
@@ -68,6 +69,10 @@ class TrupalPeerToPeer(
                     return "Session is full"
                 } else {
                     // 1. Tries to get Truid data with token
+
+                    // Kanske ändrar på flowe:t här sen. Inte det bästa att köra en try catch
+                    // för varje användare som kommer in och försöker connecta sin cookie
+                    // till session.
                     try {
                         userInfo = trupalSignup.getPresentation(request)
                     } catch (e: Forbidden) {
@@ -93,13 +98,13 @@ class TrupalPeerToPeer(
                         )
                     } catch (e: Exception) {
                         response.status = 500
-                        return "Error: Could not join session. Either the session is full or something is wrong with the database"
+                        return "Error: Could not join session."
                     }
 
                     response.status = 302
                     response.setHeader("Location", "http://localhost:8080/peer-to-peer?session=$sessionP2P")
 
-                    return "Session does exist in the database but your cookie is not connected, redirecting to confirm-signup"
+                    return "Session existed and you have now connected your cookie to the session. Redirecting to the P2P session again."
 
                 }
 

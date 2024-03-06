@@ -63,6 +63,7 @@ data class UserToken(
     val created: Instant
 )
 
+// Kod från johannes för persistable (kunna ha egna primary keys på databasgrejer):
 
 class TrupalDatabase {
 }
@@ -96,8 +97,6 @@ class TrupalDatabase {
 //        return false
 //    }
 //}
-
-
 
 
 //@Embeddable

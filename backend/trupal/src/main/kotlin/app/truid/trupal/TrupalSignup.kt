@@ -54,11 +54,6 @@ class TrupalSignup(
 
     val userTokenDB: UserTokenRepository
 ) {
-    // This variable acts as our persistence in this example
-    private var _persistedRefreshToken: String? = null
-
-//    http://localhost:8080/truid/v1/confirm-signup
-
     @GetMapping("/truid/v1/confirm-signup")
     fun test(
         response: HttpServletResponse,
@@ -91,6 +86,7 @@ class TrupalSignup(
             response.status = SC_ACCEPTED
         } else {
             // Return a 302 response in case of browser redirect
+            // Eventuellt gör om till 303
             response.status = SC_FOUND
         }
 
@@ -107,7 +103,6 @@ class TrupalSignup(
         request: HttpServletRequest,
     ): String? {
         val session = request.session
-        val presentation: ResponseEntity<PresentationResponse>
 
         if (error != null) {
             throw Forbidden(error, "There was an authorization error")
@@ -124,14 +119,13 @@ class TrupalSignup(
                 body.add("client_secret", clientSecret)
                 body.add("code_verifier", getOauth2CodeVerifier(session))
 
-
-//                Get token
+                //Get token
                 val tokenResponse =
                     restTemplate.postForEntity<TokenResponse>(truidTokenEndpoint, body, TokenResponse::class)
 
                 val cookieId = request.session.id
 
-//                Persist the refresh token
+                //Persist the refresh token
                 persist(tokenResponse.body, cookieId)
             } catch (e: ForbiddenException) {
                 throw Forbidden("access_denied", e.message)
@@ -171,14 +165,14 @@ class TrupalSignup(
 
         val cookieId = request.session.id
 
-//        Get the access token
+        //Get the access token
         val accessToken = refreshToken(cookieId)
 
         val getPresentationUri = URIBuilder(truidPresentationEndpoint)
             .addParameter("claims", "truid.app/claim/email/v1,truid.app/claim/birthdate/v1")
             .build()
 
-//        Create entity with header including access token
+        //Create entity with header including access token
         val header = HttpHeaders()
         header.contentType = APPLICATION_JSON
         header.setBearerAuth(accessToken)
@@ -186,6 +180,7 @@ class TrupalSignup(
 
         val presentationResponse =
             restTemplate.exchange(getPresentationUri, HttpMethod.GET, entity, PresentationResponse::class.java)
+
 
         return "Email: " + "${presentationResponse.body?.claims?.get(0)?.value}" + " and birthdate: " + "${
             presentationResponse.body?.claims?.get(
@@ -231,6 +226,11 @@ class TrupalSignup(
 
         persist(refreshedTokenResponse, cookieId)
 
+        println("refreshedToken: ${refreshedTokenResponse}")
+        println("refreshedToken access token: ${refreshedTokenResponse?.accessToken}")
+        println("refreshedToken type: ${refreshedTokenResponse?.tokenType}")
+
+
         if (refreshedTokenResponse == null) {
             throw Forbidden("access_denied", "No token response found")
         } else {
@@ -240,14 +240,11 @@ class TrupalSignup(
     }
 
     private fun clearPersistence(cookieId: String?) {
-//        _persistedRefreshToken = null
 
         userTokenDB.deleteUserTokenByCookie(cookieId)
     }
 
     private fun persist(tokenResponse: TokenResponse?, cookieId: String?) {
-//        _persistedRefreshToken = tokenResponse?.refreshToken
-
         userTokenDB.deleteUserTokenByCookie(cookieId)
 
         userTokenDB.save(
@@ -268,8 +265,6 @@ class TrupalSignup(
         println("refreshToken: ${userToken?.refreshToken}")
 
         return userToken?.refreshToken
-
-//        return _persistedRefreshToken
     }
 
 }
