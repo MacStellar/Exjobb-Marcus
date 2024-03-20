@@ -1,16 +1,6 @@
 --liquibase formatted sql
 
 --changeset marcusschon:interaction.1
---precondition-sql-check expectedResult:0 SELECT COUNT(to_regclass('public.interactiontest'));
-CREATE TABLE interactiontest
-(
-    id          bigserial NOT NULL PRIMARY KEY,
-    created_at  TIMESTAMP NOT NULL,
-    updated_at  TIMESTAMP NOT NULL,
-    interaction jsonb     NOT NULL
-);
-
---changeset marcusschon:interaction.2
 --precondition-sql-check expectedResult:0 SELECT COUNT(to_regclass('public.session'));
 CREATE TABLE session
 (
@@ -18,15 +8,7 @@ CREATE TABLE session
     created TIMESTAMP NOT NULL
 );
 
--- -- Add a constraint to limit the number of rows (users) per session_p2p value (om jag vill ha detta):
--- ALTER TABLE combinedusersinfo
---     ADD CONSTRAINT max_rows_per_session CHECK (
---         (SELECT COUNT(*)
---          FROM combinedusersinfo c
---          WHERE c.session_p2p = combinedusersinfo.session_p2p) <= 5
---         );
-
---changeset marcusschon:interaction.3
+--changeset marcusschon:interaction.2
 --precondition-sql-check expectedResult:0 SELECT COUNT(to_regclass('public.userSession'));
 CREATE TABLE user_session
 (
@@ -38,15 +20,7 @@ CREATE TABLE user_session
     created    TIMESTAMP NOT NULL
 );
 
-
-
--- CREATE TRIGGER check_user_session_full
---     BEFORE INSERT
---     ON user_session
---     FOR EACH ROW
---     EXECUTE FUNCTION user_session_full();
-
---changeset marcusschon:interaction.4
+--changeset marcusschon:interaction.3
 --precondition-sql-check expectedResult:0 SELECT COUNT(to_regclass('public.userTokens'));
 CREATE TABLE user_token
 (

@@ -119,7 +119,7 @@ class TrupalP2PSignup {
 
 
         @Nested
-        inner class User2CompletedSignup {
+        inner class User1CompletedSignup {
             lateinit var state: String
 
             @BeforeEach

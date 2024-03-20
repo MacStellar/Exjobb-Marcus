@@ -5,7 +5,6 @@ import jakarta.servlet.http.HttpSession
 fun createOauth2State(session: HttpSession): String {
     // Retrieve oauth2-state attribute from session, or generate and set a new one
     val oauth2State: String? = session.getAttribute("oauth2-state") as String?
-    println("What is oauth2State in OAuth2.kt? ${oauth2State}")
     return oauth2State ?: run {
         val newState = base64url(random(20))
         session.setAttribute("oauth2-state", newState)

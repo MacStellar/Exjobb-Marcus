@@ -79,6 +79,8 @@ class TrupalSignup(
 //        Setting redirect link
         response.setHeader("Location", truidSignupUrl.toString())
 
+        println("truidSignupUrl: ${truidSignupUrl}")
+
 
 //        Check if app or browser
         if (xRequestedWith == "XMLHttpRequest") {

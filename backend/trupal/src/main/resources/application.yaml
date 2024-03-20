@@ -5,33 +5,21 @@ spring:
     password: password
   liquibase:
     change-log: classpath:db/db.changelog-master.yaml
-  #Importera från local filen
-#  profiles:
-#    include:
-#      - local
 
-#Logging för databas-framework
+#Logging for database framework
 logging:
   level:
     org:
       springframework:
         jdbc: DEBUG
 
-#Inlagt från example-backend
 app:
   domain: ${TRUID_EXAMPLE_DOMAIN:http://localhost:8080}
 
 web:
   signup:
-#    Ändrade denna för att kunna presentera email
     success: ${app.domain}/truid/v1/presentation
     failure: ${app.domain}/signup/failure.html
-  login:
-    success: ${app.domain}/login/index.html
-    failure: ${app.domain}/login/failure.html
-  sign:
-    success: ${app.domain}/sign/success.html
-    failure: ${app.domain}/sign/failure.html
   peer-to-peer: ${app.domain}/peer-to-peer
 
 oauth2:
@@ -39,28 +27,7 @@ oauth2:
   clientSecret: ${TRUID_CLIENT_SECRET:test}
   redirectUri:
     signup: ${TRUID_REDIRECT_URI_SIGNUP:${app.domain}/truid/v1/complete-signup}
-    login: ${TRUID_REDIRECT_URI_LOGIN:${app.domain}/truid/v1/complete-login}
   truid:
     token-endpoint: ${TRUID_BASEPATH:https://api.truid.app}/oauth2/v1/token
     signup-endpoint: ${TRUID_BASEPATH:https://api.truid.app}/oauth2/v1/authorize/confirm-signup
-    login-endpoint: ${TRUID_BASEPATH:https://api.truid.app}/oauth2/v1/authorize/login-session
-    sign-endpoint: ${TRUID_BASEPATH:https://api.truid.app}/oauth2/v1/authorize/sign
-    sign-par-endpoint: ${TRUID_BASEPATH:https://api.truid.app}/oauth2/v1/par/sign
     presentation-endpoint: ${TRUID_BASEPATH:https://api.truid.app}/exchange/v1/presentation
-    signature-endpoint: ${TRUID_BASEPATH:https://api.truid.app}/exchange/v1/signature
-
-trustanchor:
-  truid: |
-    -----BEGIN CERTIFICATE-----
-    MIIB+zCCAaGgAwIBAgIHRxB43sp+NjAKBggqhkjOPQQDAjA1MQswCQYDVQQGEwJT
-    RTERMA8GA1UECgwIVHJ1aWQgQUIxEzARBgNVBAMMClJvb3QgQ0EgdjEwHhcNMjMw
-    NzEyMDAwMDAwWhcNMjQwNzEyMDAwMDAwWjA1MQswCQYDVQQGEwJTRTERMA8GA1UE
-    CgwIVHJ1aWQgQUIxEzARBgNVBAMMClJvb3QgQ0EgdjEwWTATBgcqhkjOPQIBBggq
-    hkjOPQMBBwNCAARxYLb0mVtzJ0E/xLD9TUVhngMCm3PE1Ce+B+VMyrPHw0NL3tZe
-    jdaVQP13E9IqUAxSkhaTX+xXnDvymDmj7/Ppo4GbMIGYMB8GA1UdIwQYMBaAFFN3
-    2xl/VZOO4szAT64B4Ah55cp1MB0GA1UdDgQWBBRTd9sZf1WTjuLMwE+uAeAIeeXK
-    dTAPBgNVHRMBAf8EBTADAQH/MA4GA1UdDwEB/wQEAwIBxjA1BgNVHR8ELjAsMCqg
-    KKAmhiRodHRwczovL2NybC50cnVpZC5hcHAvcm9vdC1jYS12MS5jcmwwCgYIKoZI
-    zj0EAwIDSAAwRQIhAOGkAyvnJX3ZGXAS1J3mPqfaljOFXCe9nvXtEP+CWm6uAiAX
-    erLifsashSSx1Vkd2KHiot0YcbZYNt65xFGNP7IhZg==
-    -----END CERTIFICATE-----
