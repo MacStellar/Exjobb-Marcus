@@ -7,6 +7,8 @@ import org.springframework.web.bind.annotation.PathVariable
 import org.springframework.web.bind.annotation.RestController
 import java.time.Instant
 
+class SessionNotFound() : Exception()
+class SessionAlreadyComplete() : Exception()
 
 @RestController
 class TrupalPeerToPeer(
@@ -15,106 +17,122 @@ class TrupalPeerToPeer(
     val trupalSignup: TrupalSignup
 ) {
 
-
+    // Creates a session and sets id in http session
     @GetMapping("/peer-to-peer")
     fun createPeerToPeerSession(
         response: HttpServletResponse,
         request: HttpServletRequest,
     ): String {
         // Saves a session to the database
-        val testEntrySession = Session(null, Instant.now())
-        val dbTestEntrySession = sessionDB.save(testEntrySession)
+        val p2pSession = sessionDB.save(Session(null, Instant.now()))
+
+        userSessionDB.save(
+            UserSession(
+                null,
+                p2pSession.id,
+                request.session.id,
+                "test_user_id",
+                null,
+                Instant.now()
+            )
+        )
 
         // Set the P2P session attribute
-        request.session.setAttribute("sessionP2P", "${dbTestEntrySession.id}")
+        request.session.setAttribute("sessionP2P", "${p2pSession.id}")
 
         response.setHeader("Location", "/truid/v1/confirm-signup")
         response.status = HttpServletResponse.SC_FOUND
 
-        return dbTestEntrySession.id!!
+        return p2pSession.id!!
     }
 
-    @GetMapping("/peer-to-peer/{sessionId}")
-    fun joinPeerToPeerSession(
-        @PathVariable(value = "sessionId") p2pSession: String,
+
+    // User redirects here after authorization at truid
+    // Fetch presentation and return link that user 1 can share
+    @GetMapping("/peer-to-peer/create")
+    fun fetchInitialPresentation(
         response: HttpServletResponse,
         request: HttpServletRequest,
     ): String {
-        if (sessionDB.existsSessionById(p2pSession)) {
-            // This is where a user tries to join a session
-            if (userSessionDB.existsUserSessionsBySessionIdAndCookieId(p2pSession, request.session.id)) {
-                // This is where a user goes if he/she has access through a cookie
+        // Saves a session to the database
+        val p2pSession = sessionDB.save(Session(null, Instant.now()))
 
-                // Downloads all userSessions from the database that are connected to the sessionP2P
-                val foundUserSessionsList = userSessionDB.getUserSessionsBySessionId(p2pSession)
-                var userInfoPrintOut = ""
-                var index = 0
+        userSessionDB.save(
+            UserSession(
+                null,
+                p2pSession.id,
+                request.session.id,
+                "test_user_id",
+                null,
+                Instant.now()
+            )
+        )
 
-                for (userSession in foundUserSessionsList!!) {
-                    index++
-                    userInfoPrintOut += "<h2> User${index}: </h2> <h3> ${userSession.userInfo} </h3>"
-                }
-                response.status = HttpServletResponse.SC_OK
+        // Set the P2P session attribute
+        request.session.setAttribute("sessionP2P", "${p2pSession.id}")
 
-                return userInfoPrintOut
+        response.setHeader("Location", "/truid/v1/confirm-signup")
+        response.status = HttpServletResponse.SC_FOUND
 
-                // Here I'm going to add the code for redirecting to the P2P chat later
+        return p2pSession.id!!
+    }
 
-            } else {
-                //This is where a new user comes in and connects their cookie to a session
-                val userInfo: String?
+    // Second user enters here. Set cookie and redirect to truid
+    @GetMapping("/peer-to-peer/{sessionId}/init-join")
+    fun joinPeerToPeerSession(
+        @PathVariable(value = "sessionId") p2pSessionId: String,
+        response: HttpServletResponse,
+        request: HttpServletRequest,
+    ) {
+        val session = sessionDB.findById(p2pSessionId).orElse(null) ?: throw SessionNotFound()
+        val userSessions = userSessionDB.getUserSessionsBySessionId(p2pSessionId)
 
-                // Block user from entering if there already are 2 in session
-                if ((userSessionDB.getUserSessionsBySessionId(p2pSession)?.size ?: 0) >= 2) {
-                    response.status = 403
-                    return "Session is full"
-                } else {
-                    // 1. Tries to get Truid data with token
-
-                    // Kanske ändrar på flowe:t här sen. Inte det bästa att köra en try catch
-                    // för varje användare som kommer in och försöker connecta sin cookie
-                    // till session.
-                    try {
-                        userInfo = trupalSignup.getPresentation(request)
-                    } catch (e: Forbidden) {
-                        // 2. If it doesn't work, redirect to confirm-signup with p2p session id saved in session for cookie on server side
-
-                        request.session.setAttribute("sessionP2P", "$p2pSession")
-                        response.status = 302
-                        response.setHeader("Location", "http://localhost:8080/truid/v1/confirm-signup")
-                        return "null"
-                    }
-
-                    // 3. If it works, add the data and cookie session to the database
-                    try {
-                        userSessionDB.save(
-                            UserSession(
-                                null,
-                                p2pSession,
-                                request.session.id,
-                                "test_user_id",
-                                userInfo,
-                                Instant.now()
-                            )
-                        )
-                    } catch (e: Exception) {
-                        response.status = 500
-                        return "Error: Could not join session."
-                    }
-
-                    response.status = 302
-                    response.setHeader("Location", "http://localhost:8080/peer-to-peer?session=$p2pSession")
-
-                    return "Session existed and you have now connected your cookie to the session. Redirecting to the P2P session again."
-
-                }
-
-
-            }
-
-        } else {
-            response.status = 404
-            return "Session does not exist"
+        if (userSessions.size > 1) {
+            throw SessionAlreadyComplete()
         }
+        if (userSessions.isEmpty()) {
+            throw RuntimeException("Session has no other member")
+        }
+
+        userSessionDB.save(
+            UserSession(
+                null,
+                p2pSessionId,
+                request.session.id,
+                "test_user_id",
+                null,
+                Instant.now()
+            )
+        )
+
+        request.session.setAttribute("sessionP2P", p2pSessionId)
+        response.status = 302
+        response.setHeader("Location", "/truid/v1/confirm-signup")
+    }
+
+    // Second user redirects here after authorization and completes the p2p
+    @GetMapping("/peer-to-peer/join")
+    fun completePeerToPeerSession(
+        response: HttpServletResponse,
+        request: HttpServletRequest,
+    ): String {
+        val p2pSessionId = request.session.getAttribute("sessionP2P") as String
+        val session = sessionDB.findById(p2pSessionId).orElse(null) ?: throw SessionNotFound()
+        val userSessions = userSessionDB.getUserSessionsBySessionId(p2pSessionId)
+
+        if (userSessions.size > 1) {
+            throw SessionAlreadyComplete()
+        }
+
+        var userInfoPrintOut = ""
+        var index = 0
+
+        for (userSession in userSessions) {
+            index++
+            userInfoPrintOut += "<h2> User${index}: </h2> <h3> ${userSession.userInfo} </h3>"
+        }
+        response.status = HttpServletResponse.SC_OK
+
+        return userInfoPrintOut
     }
 }

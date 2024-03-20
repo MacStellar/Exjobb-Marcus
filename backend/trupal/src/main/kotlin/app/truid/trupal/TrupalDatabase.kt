@@ -19,7 +19,7 @@ interface SessionRepository : CrudRepository<Session, String> {
 
 @Repository
 interface UserSessionRepository : CrudRepository<UserSession, String> {
-    fun getUserSessionsBySessionId(id: String?): List<UserSession>?
+    fun getUserSessionsBySessionId(id: String?): List<UserSession>
 
     fun existsUserSessionBySessionId(id: String?): Boolean
 
