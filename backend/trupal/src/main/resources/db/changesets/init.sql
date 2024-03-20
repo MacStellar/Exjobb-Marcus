@@ -4,7 +4,7 @@
 --precondition-sql-check expectedResult:0 SELECT COUNT(to_regclass('public.session'));
 CREATE TABLE session
 (
-    id      VARCHAR(60) DEFAULT uuid_generate_v4() PRIMARY KEY,
+    id      VARCHAR(60) DEFAULT gen_random_uuid() PRIMARY KEY,
     created TIMESTAMP NOT NULL
 );
 
@@ -12,7 +12,7 @@ CREATE TABLE session
 --precondition-sql-check expectedResult:0 SELECT COUNT(to_regclass('public.userSession'));
 CREATE TABLE user_session
 (
-    id         VARCHAR(60) DEFAULT uuid_generate_v4() PRIMARY KEY,
+    id         VARCHAR(60) DEFAULT gen_random_uuid() PRIMARY KEY,
     session_id VARCHAR   NOT NULL REFERENCES session (id) ON DELETE CASCADE,
     cookie_id  VARCHAR   NOT NULL,
     user_id    VARCHAR   NOT NULL,
@@ -24,7 +24,7 @@ CREATE TABLE user_session
 --precondition-sql-check expectedResult:0 SELECT COUNT(to_regclass('public.userTokens'));
 CREATE TABLE user_token
 (
-    id            VARCHAR(60) DEFAULT uuid_generate_v4() PRIMARY KEY,
+    id            VARCHAR(60) DEFAULT gen_random_uuid() PRIMARY KEY,
     cookie        VARCHAR   NOT NULL UNIQUE,
     user_id       VARCHAR   NOT NULL,
     refresh_token VARCHAR   NOT NULL,

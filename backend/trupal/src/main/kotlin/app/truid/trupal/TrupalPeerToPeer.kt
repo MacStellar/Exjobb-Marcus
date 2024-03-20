@@ -2,9 +2,8 @@ package app.truid.trupal
 
 import jakarta.servlet.http.HttpServletRequest
 import jakarta.servlet.http.HttpServletResponse
-import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.web.bind.annotation.GetMapping
-import org.springframework.web.bind.annotation.RequestParam
+import org.springframework.web.bind.annotation.PathVariable
 import org.springframework.web.bind.annotation.RestController
 import java.time.Instant
 
@@ -18,34 +17,36 @@ class TrupalPeerToPeer(
 
 
     @GetMapping("/peer-to-peer")
-    fun peerToPeer(
-        @RequestParam("session") sessionP2P: String?, response: HttpServletResponse, request: HttpServletRequest
+    fun createPeerToPeerSession(
+        response: HttpServletResponse,
+        request: HttpServletRequest,
     ): String {
+        // Saves a session to the database
+        val testEntrySession = Session(null, Instant.now())
+        val dbTestEntrySession = sessionDB.save(testEntrySession)
 
+        // Set the P2P session attribute
+        request.session.setAttribute("sessionP2P", "${dbTestEntrySession.id}")
 
-        if (sessionP2P == null) {
+        response.setHeader("Location", "/truid/v1/confirm-signup")
+        response.status = HttpServletResponse.SC_FOUND
 
-            // Saves a session to the database
-            val testEntrySession = Session(null, Instant.now())
-            val dbTestEntrySession = sessionDB.save(testEntrySession)
+        return dbTestEntrySession.id!!
+    }
 
-            // Set the P2P session attribute
-            request.session.setAttribute("sessionP2P", "${dbTestEntrySession.id}")
-
-            response.setHeader("Location", "http://localhost:8080/truid/v1/confirm-signup")
-            response.status = HttpServletResponse.SC_FOUND
-
-            return dbTestEntrySession.id!!
-
-        }
-
-        if (sessionDB.existsSessionById(sessionP2P)) {
+    @GetMapping("/peer-to-peer/{sessionId}")
+    fun joinPeerToPeerSession(
+        @PathVariable(value = "sessionId") p2pSession: String,
+        response: HttpServletResponse,
+        request: HttpServletRequest,
+    ): String {
+        if (sessionDB.existsSessionById(p2pSession)) {
             // This is where a user tries to join a session
-            if (userSessionDB.existsUserSessionsBySessionIdAndCookieId(sessionP2P, request.session.id)) {
+            if (userSessionDB.existsUserSessionsBySessionIdAndCookieId(p2pSession, request.session.id)) {
                 // This is where a user goes if he/she has access through a cookie
 
                 // Downloads all userSessions from the database that are connected to the sessionP2P
-                val foundUserSessionsList = userSessionDB.getUserSessionsBySessionId(sessionP2P)
+                val foundUserSessionsList = userSessionDB.getUserSessionsBySessionId(p2pSession)
                 var userInfoPrintOut = ""
                 var index = 0
 
@@ -64,7 +65,7 @@ class TrupalPeerToPeer(
                 val userInfo: String?
 
                 // Block user from entering if there already are 2 in session
-                if ((userSessionDB.getUserSessionsBySessionId(sessionP2P)?.size ?: 0) >= 2) {
+                if ((userSessionDB.getUserSessionsBySessionId(p2pSession)?.size ?: 0) >= 2) {
                     response.status = 403
                     return "Session is full"
                 } else {
@@ -78,7 +79,7 @@ class TrupalPeerToPeer(
                     } catch (e: Forbidden) {
                         // 2. If it doesn't work, redirect to confirm-signup with p2p session id saved in session for cookie on server side
 
-                        request.session.setAttribute("sessionP2P", "$sessionP2P")
+                        request.session.setAttribute("sessionP2P", "$p2pSession")
                         response.status = 302
                         response.setHeader("Location", "http://localhost:8080/truid/v1/confirm-signup")
                         return "null"
@@ -89,7 +90,7 @@ class TrupalPeerToPeer(
                         userSessionDB.save(
                             UserSession(
                                 null,
-                                sessionP2P,
+                                p2pSession,
                                 request.session.id,
                                 "test_user_id",
                                 userInfo,
@@ -102,7 +103,7 @@ class TrupalPeerToPeer(
                     }
 
                     response.status = 302
-                    response.setHeader("Location", "http://localhost:8080/peer-to-peer?session=$sessionP2P")
+                    response.setHeader("Location", "http://localhost:8080/peer-to-peer?session=$p2pSession")
 
                     return "Session existed and you have now connected your cookie to the session. Redirecting to the P2P session again."
 
@@ -116,6 +117,4 @@ class TrupalPeerToPeer(
             return "Session does not exist"
         }
     }
-
-
 }

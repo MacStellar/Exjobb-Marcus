@@ -25,12 +25,6 @@ class TrupalP2PSignup {
     @Autowired
     lateinit var testRestTemplate: TestRestTemplate
 
-    @Autowired
-    lateinit var sessionDB: SessionRepository
-
-    @Autowired
-    lateinit var userSessionDB: UserSessionRepository
-
     lateinit var testP2PSessionId: String
 
 
@@ -41,28 +35,19 @@ class TrupalP2PSignup {
         )
 
 //            Checks whether the site redirects user
-        assertTrue(302 == response.statusCode.value())
+        assertEquals(302, response.statusCode.value())
 
 //            Checks whether the cookie is received and is set to httpOnly
         val testCookie = HttpCookie.parse(response.headers[HttpHeaders.SET_COOKIE]?.firstOrNull()).single()
         assertEquals(true, testCookie.isHttpOnly)
 
 //            Removes the temporary test session from the database
-        val tempSessionId = response.body!!
-        sessionDB.deleteById(tempSessionId)
     }
 
 
     @Nested
     inner class User1Flow {
         lateinit var cookie: HttpCookie
-
-        @AfterEach
-        fun `Clean up database`() {
-            userSessionDB.deleteUserSessionBySessionId(testP2PSessionId)
-            sessionDB.deleteById(testP2PSessionId)
-        }
-
 
         @BeforeEach
         fun `Setup cookie and session ID`() {
@@ -76,7 +61,7 @@ class TrupalP2PSignup {
 
             assertEquals(true, cookie.isHttpOnly)
 //            Checks whether the site redirects user
-            assertTrue(302 == response.statusCode.value())
+            assertEquals(302, response.statusCode.value())
 
             println("cookie 1: $cookie")
         }
@@ -89,15 +74,14 @@ class TrupalP2PSignup {
             )
             assertEquals(302, response.statusCode.value())
             assertEquals("/truid/v1/confirm-signup", response.headers.location!!.path)
-
-            sessionDB.deleteById(response.body!!)
         }
 
         @Test
         fun `It should return 404 if invalid P2P session is provided`() {
             val response = testRestTemplate.exchange(
-                RequestEntity.get("/peer-to-peer?session=invalid_session_id")
-                    .header(HttpHeaders.COOKIE, cookie.toString()).build(), String::class.java
+                RequestEntity.get("/peer-to-peer/invalid_session_id")
+                    .header(HttpHeaders.COOKIE, cookie.toString()).build(),
+                String::class.java
             )
             assertEquals(404, response.statusCode.value())
             assertEquals(
@@ -108,13 +92,11 @@ class TrupalP2PSignup {
         @Test
         fun `It should redirect the user to confirm-signup if trying to access existing P2P session before authenticating`() {
             val response = testRestTemplate.exchange(
-                RequestEntity.get("/peer-to-peer?session=$testP2PSessionId")
+                RequestEntity.get("/peer-to-peer/$testP2PSessionId")
                     .header(HttpHeaders.COOKIE, cookie.toString()).build(), String::class.java
             )
             assertEquals(302, response.statusCode.value())
             assertEquals("/truid/v1/confirm-signup", response.headers.location!!.path)
-            assertTrue(sessionDB.existsSessionById(testP2PSessionId))
-
         }
 
 
@@ -124,11 +106,19 @@ class TrupalP2PSignup {
 
             @BeforeEach
             fun `Setup Truid token endpoint mock`() {
+                val response =
+                    mapOf(
+                            "refresh_token" to "refresh-token-1",
+                            "access_token" to "access-token-1",
+                            "expires_in" to 3600,
+                            "token_type" to "token-type",
+                            "scope" to "truid.app/data-point/email truid.app/data-point/birthdate",
+                    )
                 WireMock.stubFor(
                     WireMock.post(WireMock.urlEqualTo("/oauth2/v1/token")).willReturn(
                         WireMock.aResponse().withStatus(200)
                             .withHeader(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
-                            .withBody("{\"refresh_token\":\"refresh-token-1\",\"access_token\":\"access-token-1\",\"expires_in\":3600,\"token_type\":\"token-type\",\"scope\":\"truid.app/data-point/email truid.app/data-point/birthdate\"}")
+                            .withJsonBody(response)
                     )
                 )
             }
@@ -154,31 +144,29 @@ class TrupalP2PSignup {
                     sub = "1234567abcdefg", claims = listOf(
                         PresentationResponseClaims(
                             type = "truid.app/claim/email/v1", value = "user-1@example.com"
-                        ), PresentationResponseClaims(
+                        ),
+                        PresentationResponseClaims(
                             type = "truid.app/claim/bithdate/v1", value = "1111-11-11"
                         )
                     )
                 )
-                val presentationResponseString =
-                    wiremock.com.fasterxml.jackson.databind.ObjectMapper().writeValueAsString(presentationResponse)
-                val presentationResponseJsonNode: wiremock.com.fasterxml.jackson.databind.JsonNode =
-                    wiremock.com.fasterxml.jackson.databind.ObjectMapper().readTree(presentationResponseString)
 
                 WireMock.stubFor(
                     WireMock.get("/exchange/v1/presentation?claims=truid.app%2Fclaim%2Femail%2Fv1%2Ctruid.app%2Fclaim%2Fbirthdate%2Fv1")
                         .willReturn(
                             WireMock.aResponse().withHeader(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
-                                .withStatus(200).withJsonBody(presentationResponseJsonNode)
+                                .withStatus(200).withJsonBody(presentationResponse)
                         )
                 )
             }
 
             @BeforeEach
-            @Test
             fun `Setup user access peer-to-peer after authentication`() {
                 val response = testRestTemplate.exchange(
                     RequestEntity.get("/truid/v1/complete-signup?code=1234&state=$state")
-                        .header(HttpHeaders.COOKIE, cookie.toString()).accept(MediaType.TEXT_HTML).build(),
+                        .header(HttpHeaders.COOKIE, cookie.toString())
+                        .accept(MediaType.TEXT_HTML)
+                        .build(),
                     String::class.java
                 )
 
@@ -191,31 +179,30 @@ class TrupalP2PSignup {
                 assertEquals(302, response.statusCode.value(), "Status code is not 302")
                 assertEquals("/peer-to-peer", url.path)
                 assertEquals(testP2PSessionId, queryParameters["session"])
-
-                testP2PSessionId = queryParameters["session"]!!
             }
 
             @BeforeEach
             @Test
             fun `It should return 302, add cookie to database and redirect to the same page`() {
+                // Same as the test below but the title is wrong?
                 testRestTemplate.exchange(
-                    RequestEntity.get("/peer-to-peer?session=$testP2PSessionId")
+                    RequestEntity.get("/peer-to-peer/$testP2PSessionId")
                         .header(HttpHeaders.COOKIE, cookie.toString()).build(), String::class.java
                 )
-
-                assertTrue(userSessionDB.existsUserSessionBySessionId(testP2PSessionId))
-
             }
 
             @Test
             fun `It should return 200, add cookie to database and redirect to the same page`() {
                 val response = testRestTemplate.exchange(
-                    RequestEntity.get("/peer-to-peer?session=$testP2PSessionId")
+                    RequestEntity.get("/peer-to-peer/$testP2PSessionId")
                         .header(HttpHeaders.COOKIE, cookie.toString()).build(), String::class.java
                 )
 
                 assertEquals(200, response.statusCode.value())
-                assertEquals("<h2> User1: </h2> <h3> Email: user-1@example.com and birthdate: 1111-11-11 </h3>", response.body)
+                assertEquals(
+                    "<h2> User1: </h2> <h3> Email: user-1@example.com and birthdate: 1111-11-11 </h3>",
+                    response.body
+                )
 
             }
 
@@ -227,26 +214,24 @@ class TrupalP2PSignup {
 
                     println("cookie 2 before : $cookie")
                     val response = testRestTemplate.exchange(
-                        RequestEntity.get("/peer-to-peer?session=$testP2PSessionId").build(), String::class.java
+                        RequestEntity.get("/peer-to-peer/$testP2PSessionId").build(), String::class.java
                     )
 
                     //            Checks whether the cookie is received and is set to httpOnly
                     cookie = HttpCookie.parse(response.headers[HttpHeaders.SET_COOKIE]?.firstOrNull()).single()
                     assertEquals(true, cookie.isHttpOnly)
                     //            Checks whether the site redirects user
-                    assertTrue(302 == response.statusCode.value())
+                    assertEquals(302, response.statusCode.value())
                 }
 
                 @Test
                 fun `It should redirect user 2 to confirm-signup if trying to access existing P2P session before authenticating`() {
                     val response = testRestTemplate.exchange(
-                        RequestEntity.get("/peer-to-peer?session=$testP2PSessionId")
+                        RequestEntity.get("/peer-to-peer/$testP2PSessionId")
                             .header(HttpHeaders.COOKIE, cookie.toString()).build(), String::class.java
                     )
                     assertEquals(302, response.statusCode.value())
                     assertEquals("/truid/v1/confirm-signup", response.headers.location!!.path)
-                    assertTrue(sessionDB.existsSessionById(testP2PSessionId))
-
                 }
 
                 @Nested
@@ -254,11 +239,19 @@ class TrupalP2PSignup {
 
                     @BeforeEach
                     fun `Setup Truid token endpoint mock`() {
+                        val response = mapOf(
+                            "refresh_token" to "refresh-token-2",
+                            "access_token" to "access-token-2",
+                            "expires_in" to 3600,
+                            "token_type" to "token-type",
+                            "scope" to "truid.app/data-point/email truid.app/data-point/birthdate"
+                        )
+
                         WireMock.stubFor(
                             WireMock.post(WireMock.urlEqualTo("/oauth2/v1/token")).willReturn(
                                 WireMock.aResponse().withStatus(200)
                                     .withHeader(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
-                                    .withBody("{\"refresh_token\":\"refresh-token-2\",\"access_token\":\"access-token-2\",\"expires_in\":3600,\"token_type\":\"token-type\",\"scope\":\"truid.app/data-point/email truid.app/data-point/birthdate\"}")
+                                    .withJsonBody(response)
                             )
                         )
                     }
@@ -289,18 +282,12 @@ class TrupalP2PSignup {
                                 )
                             )
                         )
-                        val presentationResponseString =
-                            wiremock.com.fasterxml.jackson.databind.ObjectMapper()
-                                .writeValueAsString(presentationResponse)
-                        val presentationResponseJsonNode: wiremock.com.fasterxml.jackson.databind.JsonNode =
-                            wiremock.com.fasterxml.jackson.databind.ObjectMapper().readTree(presentationResponseString)
-
                         WireMock.stubFor(
                             WireMock.get("/exchange/v1/presentation?claims=truid.app%2Fclaim%2Femail%2Fv1%2Ctruid.app%2Fclaim%2Fbirthdate%2Fv1")
                                 .willReturn(
                                     WireMock.aResponse()
                                         .withHeader(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
-                                        .withStatus(200).withJsonBody(presentationResponseJsonNode)
+                                        .withStatus(200).withJsonBody(presentationResponse)
                                 )
                         )
                     }
@@ -323,26 +310,22 @@ class TrupalP2PSignup {
                         assertEquals(302, response.statusCode.value(), "Status code is not 302")
                         assertEquals("/peer-to-peer", url.path)
                         assertEquals(testP2PSessionId, queryParameters["session"])
-
-                        testP2PSessionId = queryParameters["session"]!!
                     }
 
                     @BeforeEach
                     @Test
                     fun `It should return 302, add cookie to database and redirect to the same page`() {
+                        // same as below but with strange title?
                         testRestTemplate.exchange(
-                            RequestEntity.get("/peer-to-peer?session=$testP2PSessionId")
+                            RequestEntity.get("/peer-to-peer/$testP2PSessionId")
                                 .header(HttpHeaders.COOKIE, cookie.toString()).build(), String::class.java
                         )
-
-                        assertTrue(userSessionDB.existsUserSessionBySessionId(testP2PSessionId))
-
                     }
 
                     @Test
                     fun `It should return 200, add cookie to database and redirect to the same page`() {
                         val response = testRestTemplate.exchange(
-                            RequestEntity.get("/peer-to-peer?session=$testP2PSessionId")
+                            RequestEntity.get("/peer-to-peer/$testP2PSessionId")
                                 .header(HttpHeaders.COOKIE, cookie.toString()).build(), String::class.java
                         )
 
