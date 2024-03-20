@@ -1,0 +1,38 @@
+spring:
+  main:
+    allow-bean-definition-overriding: true
+
+oauth2:
+  truid:
+    token-endpoint: ${wiremock.server.baseUrl}/oauth2/v1/token
+    signup-endpoint: ${wiremock.server.baseUrl}/oauth2/v1/authorize/confirm-signup
+    presentation-endpoint: ${wiremock.server.baseUrl}/exchange/v1/presentation
+
+#    Används inte i SignupControllerTest:
+#    login-endpoint: ${TRUID_BASEPATH:https://api.truid.app}/oauth2/v1/authorize/login-session
+#    sign-endpoint: ${TRUID_BASEPATH:https://api.truid.app}/oauth2/v1/authorize/sign
+#    sign-par-endpoint: ${TRUID_BASEPATH:https://api.truid.app}/oauth2/v1/par/sign
+#    signature-endpoint: ${TRUID_BASEPATH:https://api.truid.app}/exchange/v1/signature
+
+
+
+wiremock:
+  server:
+    httpsPort: -1
+    baseUrl: http://localhost:${wiremock.server.port}
+  reset-mappings-after-each-test: true
+
+trustanchor:
+  truid: |
+    -----BEGIN CERTIFICATE----- \
+    MIIByjCCAXCgAwIBAgIHRywTxCViqzAKBggqhkjOPQQDAjA5MQswCQYDVQQGEwJT \
+    RTERMA8GA1UECgwIVHJ1aWQgQUIxFzAVBgNVBAMMDkRldiBSb290IENBIHYxMB4X \
+    DTIzMDgxNjAwMDAwMFoXDTI0MDgxNjAwMDAwMFowOTELMAkGA1UEBhMCU0UxETAP \
+    BgNVBAoMCFRydWlkIEFCMRcwFQYDVQQDDA5EZXYgUm9vdCBDQSB2MTBZMBMGByqG \
+    SM49AgEGCCqGSM49AwEHA0IABOwB6NN7TT6FPi5gKnUCfWCgOT1twt9VxmF5tATp \
+    rKSmjDcC5MrdjXKhhyYG+75pckeiU5kcDZAJ7QvFWI+Qz+KjYzBhMB8GA1UdIwQY \
+    MBaAFPNkGaeiSTa3MVH+mBYzlzXLrhF7MB0GA1UdDgQWBBTzZBmnokk2tzFR/pgW \
+    M5c1y64RezAPBgNVHRMBAf8EBTADAQH/MA4GA1UdDwEB/wQEAwIBxjAKBggqhkjO \
+    PQQDAgNIADBFAiBAiwCZmqHoQwhN164DGGpgJ9OQ6Qy/MIJ0EwiSZHxH8AIhAKOt \
+    amHhlgpDKiykZVyYwACQ2HJbV7H8uhklgW/HfSz+ \
+    -----END CERTIFICATE-----

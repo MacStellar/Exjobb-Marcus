@@ -1,0 +1,33 @@
+spring:
+  datasource:
+    url: jdbc:postgresql://localhost:5432/trupal
+    username: postgres
+    password: password
+  liquibase:
+    change-log: classpath:db/db.changelog-master.yaml
+
+#Logging for database framework
+logging:
+  level:
+    org:
+      springframework:
+        jdbc: DEBUG
+
+app:
+  domain: ${TRUID_EXAMPLE_DOMAIN:http://localhost:8080}
+
+web:
+  signup:
+    success: ${app.domain}/truid/v1/presentation
+    failure: ${app.domain}/signup/failure.html
+  peer-to-peer: ${app.domain}/peer-to-peer
+
+oauth2:
+  clientId: ${TRUID_CLIENT_ID:test}
+  clientSecret: ${TRUID_CLIENT_SECRET:test}
+  redirectUri:
+    signup: ${TRUID_REDIRECT_URI_SIGNUP:${app.domain}/truid/v1/complete-signup}
+  truid:
+    token-endpoint: ${TRUID_BASEPATH:https://api.truid.app}/oauth2/v1/token
+    signup-endpoint: ${TRUID_BASEPATH:https://api.truid.app}/oauth2/v1/authorize/confirm-signup
+    presentation-endpoint: ${TRUID_BASEPATH:https://api.truid.app}/exchange/v1/presentation
