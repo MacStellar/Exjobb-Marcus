@@ -8,6 +8,11 @@ import org.springframework.web.bind.annotation.RestController
 import java.time.Instant
 
 
+data class SessionResponse(
+    var id: String,
+    val created: Instant,
+)
+
 @RestController
 class TrupalPeerToPeer(
     val sessionDB: SessionRepository,
@@ -20,7 +25,7 @@ class TrupalPeerToPeer(
     fun createPeerToPeerSession(
         response: HttpServletResponse,
         request: HttpServletRequest,
-    ): String {
+    ): SessionResponse {
         // Saves a session to the database
         val testEntrySession = Session(null, Instant.now())
         val dbTestEntrySession = sessionDB.save(testEntrySession)
@@ -31,7 +36,7 @@ class TrupalPeerToPeer(
         response.setHeader("Location", "/truid/v1/confirm-signup")
         response.status = HttpServletResponse.SC_FOUND
 
-        return dbTestEntrySession.id!!
+        return SessionResponse(id = testEntrySession.id!!, created = testEntrySession.created)
     }
 
     @GetMapping("/peer-to-peer/{sessionId}")
