@@ -15,6 +15,12 @@ import java.time.Instant
 interface SessionRepository : CrudRepository<Session, String> {
 
     fun existsSessionById(id: String?): Boolean
+
+    fun getSessionById(id: String?): Session?
+
+    @Query("select status from session where id = :id")
+    fun getStatusById(id: String?): String?
+
 }
 
 @Repository
@@ -23,7 +29,7 @@ interface UserSessionRepository : CrudRepository<UserSession, String> {
 
     fun existsUserSessionBySessionId(id: String?): Boolean
 
-    fun existsUserSessionsBySessionIdAndCookieId(session_id: String?, cookie_id: String?): Boolean
+    fun existsUserSessionsBySessionIdAndUserId(session_id: String?, user_id: String?): Boolean
 
     @Modifying
     @Query("delete from user_session o where o.session_id = :session_id")
@@ -33,32 +39,11 @@ interface UserSessionRepository : CrudRepository<UserSession, String> {
 
 @Repository
 interface UserTokenRepository : CrudRepository<UserToken, String> {
-    fun getUserTokenByCookie(cookie: String?): UserToken?
+    fun getUserTokenByUserId(user_id: String?): UserToken?
 
     @Modifying
-    @Query("delete from user_token o where o.cookie = :cookie")
-    fun deleteUserTokenByCookie(cookie: String?)
+    @Query("delete from user_token o where o.user_id = :user_id")
+    fun deleteUserTokenByUserId(user_id: String?)
 
 }
 
-@Table("session")
-data class Session(@Id var id: String?, val created: Instant)
-
-@Table("user_session")
-data class UserSession(
-    @Id var id: String?,
-    val sessionId: String?,
-    val cookieId: String?,
-    val userId: String?,
-    val userInfo: String?,
-    val created: Instant
-)
-
-@Table("user_token")
-data class UserToken(
-    @Id var id: String?,
-    val cookie: String?,
-    val userId: String?,
-    val refreshToken: String?,
-    val created: Instant
-)
