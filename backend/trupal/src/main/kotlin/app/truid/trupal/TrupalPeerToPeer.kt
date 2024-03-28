@@ -430,11 +430,16 @@ class TrupalPeerToPeer(
             }
         }
 
-        var userDataString = ""
+        var index = 0
+        var userDataString = "["
         for (userSession in userData) {
-
-            userDataString = userDataString.plus(" ${userSession.userInfo} </br>")
+            userDataString = userDataString.plus("${userSession.userInfo}")
+            if (index < userData.size - 1) {
+                userDataString = userDataString.plus(",")
+            }
+            index++
         }
+        userDataString = userDataString.plus("]")
 
         // For some reason the session cookie is not returned to the user browser in the response unless i add this line
         // It seems like this is because the return is a string (and not a redirect or something)

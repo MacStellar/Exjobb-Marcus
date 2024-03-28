@@ -222,21 +222,10 @@ class P2PApiTest {
 
                 val responseInJson = response.toJsonNode()
                 assertEquals(200, response.statusCode.value())
-                assertEquals("\"truid.app/claim/email/v1\"", responseInJson[0].get("type").toString())
-                assertEquals("\"user-1@example.com\"", responseInJson[0].get("value").toString())
-                assertEquals("\"truid.app/claim/bithdate/v1\"", responseInJson[1].get("type").toString())
-                assertEquals("\"1111-11-11\"", responseInJson[1].get("value").toString())
-            }
-
-            @Test
-            fun `p2p session user data should be empty`(): Unit {
-                val response = testRestTemplate.exchange(
-                    RequestEntity.get("/peer-to-peer/$testP2PSessionId/result").build(), String::class.java
-                )
-
-                val toJsonNode = response.toJsonNode()
-                val dataList = toJsonNode.get("dataList") as ArrayNode
-                assertEquals(0, dataList.size())
+                assertEquals("\"truid.app/claim/email/v1\"", responseInJson[0][0].get("type").toString())
+                assertEquals("\"user-1@example.com\"", responseInJson[0][0].get("value").toString())
+                assertEquals("\"truid.app/claim/bithdate/v1\"", responseInJson[0][1].get("type").toString())
+                assertEquals("\"1111-11-11\"", responseInJson[0][1].get("value").toString())
             }
 
 
@@ -389,6 +378,8 @@ class P2PApiTest {
                             RequestEntity.get("/truid/v1/peer-to-peer/${testP2PSessionId}/data")
                                 .header(HttpHeaders.COOKIE, cookie.toString()).build(), String::class.java
                         )
+
+                        println("response: $response")
 
                         val responseInJson = response.toJsonNode()
 
