@@ -13,11 +13,11 @@ CREATE TABLE session
 --precondition-sql-check expectedResult:0 SELECT COUNT(to_regclass('public.userSession'));
 CREATE TABLE user_session
 (
-    id         VARCHAR(60) DEFAULT gen_random_uuid() PRIMARY KEY,
-    session_id VARCHAR   NOT NULL REFERENCES session (id) ON DELETE CASCADE,
-    user_id    VARCHAR   NOT NULL,
-    user_info  VARCHAR   NOT NULL,
-    created    TIMESTAMP NOT NULL
+    id                VARCHAR(60) DEFAULT gen_random_uuid() PRIMARY KEY,
+    session_id        VARCHAR   NOT NULL REFERENCES session (id) ON DELETE CASCADE,
+    user_id           VARCHAR   NOT NULL,
+    user_presentation VARCHAR   NOT NULL,
+    created           TIMESTAMP NOT NULL
 );
 
 --changeset marcusschon:interaction.3

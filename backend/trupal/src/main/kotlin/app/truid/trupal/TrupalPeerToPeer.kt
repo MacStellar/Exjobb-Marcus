@@ -167,7 +167,6 @@ class TrupalPeerToPeer(
 
             userOneId = userOneInfo?.sub.toString()
             session.setAttribute("userId", userOneId)
-            println("userOne session id: ${request.session.id}")
 
             //Persist the refresh token
             persist(tokenResponse.body, userOneId)
@@ -175,16 +174,11 @@ class TrupalPeerToPeer(
             throw Forbidden("access_denied", e.message)
         }
 
-        val userOneDatapoints = map.writeValueAsString(userOneInfo!!.claims)
-//        val testRead = mapper.readTree(userOneDatapoints)
-//        println("testRead: ${testRead[0].get("value")}")
-//        println("userOneInto.claims before mapping: ${userOneInfo?.claims.toString()}")
-//        println("userOneDatapoints: $userOneDatapoints")
-
-
         // Set status of session to INITIATED
         p2pSession.status = "INITIATED"
         sessionDB.save(p2pSession)
+
+        println("userOneInfo: $userOneInfo")
 
         // Saves a user session to the database
         userSessionDB.save(
@@ -192,7 +186,7 @@ class TrupalPeerToPeer(
                 null,
                 p2pSessionId,
                 userOneId,
-                userOneDatapoints,
+                userOneInfo,
                 Instant.now()
             )
         )
@@ -334,7 +328,6 @@ class TrupalPeerToPeer(
 
             userTwoId = userTwoInfo?.sub.toString()
             session.setAttribute("userId", userTwoId)
-            println("userOne session id: ${request.session.id}")
 
             //Persist the refresh token
             persist(tokenResponse.body, userTwoId)
@@ -342,9 +335,6 @@ class TrupalPeerToPeer(
             throw Forbidden("access_denied", e.message)
         }
 
-
-//        val p2pSessionId = request.session.getAttribute("p2pSession") as String
-//        val userSessions = userSessionDB.getUserSessionsBySessionId(p2pSessionId)
         if (userSessionDB.existsUserSessionsBySessionIdAndUserId(p2pSessionId, request.session.id)) {
             response.status = 302
             response.setHeader("Location", "http://localhost:8080/truid/v1/peer-to-peer/${p2pSessionId}/data")
@@ -352,14 +342,12 @@ class TrupalPeerToPeer(
             throw SessionAlreadyComplete()
         }
 
-
-        val userTwoDatapoints = map.writeValueAsString(userTwoInfo!!.claims)
         userSessionDB.save(
             UserSession(
                 null,
                 p2pSessionId,
                 userTwoId,
-                userTwoDatapoints,
+                userTwoInfo,
                 Instant.now()
             )
         )
@@ -393,7 +381,7 @@ class TrupalPeerToPeer(
         @PathVariable(value = "sessionId") p2pSessionId: String,
         response: HttpServletResponse,
         request: HttpServletRequest
-    ): String? {
+    ): MutableList<PresentationResponse>? {
         // Get PPID from server side session connected to cookie
         // Check if PPID is connected to any of the userSessions connected to the session
         // Return data from both users if TRUE
@@ -402,7 +390,6 @@ class TrupalPeerToPeer(
         sessionDB.findById(p2pSessionId).orElseThrow() {
             P2PSessionNotFound()
         }
-
 
         if (request.session.getAttribute("userId") == null) {
             response.status = 302
@@ -430,16 +417,13 @@ class TrupalPeerToPeer(
             }
         }
 
-        var index = 0
-        var userDataString = "["
+        println("userData: ${userData[0].userPresentation}")
+
+        val userPresentations = mutableListOf<PresentationResponse>()
+
         for (userSession in userData) {
-            userDataString = userDataString.plus("${userSession.userInfo}")
-            if (index < userData.size - 1) {
-                userDataString = userDataString.plus(",")
-            }
-            index++
+            userPresentations.add(userSession.userPresentation!!)
         }
-        userDataString = userDataString.plus("]")
 
         // For some reason the session cookie is not returned to the user browser in the response unless i add this line
         // It seems like this is because the return is a string (and not a redirect or something)
@@ -447,26 +431,8 @@ class TrupalPeerToPeer(
         request.session.id
         response.addCookie(Cookie("JSESSIONID", request.session.id))
 
-        return userDataString
+        return userPresentations
     }
-
-//    @GetMapping("/test")
-//    fun test(
-////        @PathVariable(value = "sessionId") p2pSessionId: String,
-//        response: HttpServletResponse,
-//        request: HttpServletRequest,
-//    ): String? {
-//
-//        // For some reason the session cookie is not returned to the user browser in the response unless i add this line
-//        // It seems like this is because the return is a string (and not a redirect or something)
-//        // The session id is probably automatically added to the header when the request.session.id is called
-//        request.session.id
-//
-////        println("session id: ${request.session.id}")
-//
-////        response.addCookie(Cookie("JSESSIONID", request.session.id))
-//        return "test"
-//    }
 
     @ExceptionHandler(Forbidden::class)
     fun handleForbidden(

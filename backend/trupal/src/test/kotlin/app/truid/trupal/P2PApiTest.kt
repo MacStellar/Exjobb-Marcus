@@ -18,8 +18,10 @@ import com.fasterxml.jackson.databind.ObjectMapper
 import com.github.tomakehurst.wiremock.client.ResponseDefinitionBuilder
 import org.junit.jupiter.api.*
 import org.springframework.http.ResponseEntity
+import org.springframework.util.LinkedMultiValueMap
 import org.testcontainers.shaded.com.fasterxml.jackson.databind.node.ArrayNode
 import java.net.HttpCookie
+import java.time.Instant
 
 @AutoConfigureWireMock(port = 0)
 @ActiveProfiles("test")
@@ -30,6 +32,34 @@ class P2PApiTest {
     lateinit var testRestTemplate: TestRestTemplate
 
     lateinit var testP2PSessionId: String
+
+    @Autowired
+    lateinit var userSessionDB: UserSessionRepository
+
+
+    @Test
+    fun `It should be able to upload, download and convert PresentationResponse objects`() {
+        val presentationResponse = PresentationResponse(
+            sub = "test_db", claims = listOf(
+                PresentationResponseClaims(
+                    type = "truid.app/claim/email/v1", value = "test@example.com"
+                ), PresentationResponseClaims(type = "truid.app/claim/bithdate/v1", value = "tttt-tt-tt")
+            )
+        )
+
+        userSessionDB.save(
+            UserSession(
+                null,
+                "15713d0a-59b6-4648-84d7-9f07d8ab7ef2",
+                "222_test_test_test_DB",
+                presentationResponse,
+                Instant.now()
+            )
+        )
+        val userSessionsPlural = userSessionDB.getUserSessionsBySessionId("15713d0a-59b6-4648-84d7-9f07d8ab7ef2")
+        println("userSessionsPlural: $userSessionsPlural")
+        print("type of userSessionsPlural: ${userSessionsPlural[1].userPresentation!!.javaClass}")
+    }
 
     @Test
     fun `It should return a cookie`() {
@@ -215,24 +245,34 @@ class P2PApiTest {
 
             @Test
             fun `It should return status 200 and user 1 data`() {
-                val response = testRestTemplate.exchange(
-                    RequestEntity.get("/truid/v1/peer-to-peer/$testP2PSessionId/data")
-                        .header(HttpHeaders.COOKIE, cookie.toString()).build(), String::class.java
+                val presentationResponse = PresentationResponse(
+                    sub = "1234567userone", claims = listOf(
+                        PresentationResponseClaims(
+                            type = "truid.app/claim/email/v1", value = "user-1@example.com"
+                        ),
+                        PresentationResponseClaims(
+                            type = "truid.app/claim/bithdate/v1", value = "1111-11-11"
+                        )
+                    )
                 )
 
-                val responseInJson = response.toJsonNode()
-                assertEquals(200, response.statusCode.value())
-                assertEquals("\"truid.app/claim/email/v1\"", responseInJson[0][0].get("type").toString())
-                assertEquals("\"user-1@example.com\"", responseInJson[0][0].get("value").toString())
-                assertEquals("\"truid.app/claim/bithdate/v1\"", responseInJson[0][1].get("type").toString())
-                assertEquals("\"1111-11-11\"", responseInJson[0][1].get("value").toString())
+                val presentationResponseJson = mapper.writeValueAsString(presentationResponse)
+                val presentationResponseJsonCleaned = presentationResponseJson.replace("\"", "").replace(",", ", ").replace(":", "=")
+
+                val response = testRestTemplate.exchange(
+                    RequestEntity.get("/truid/v1/peer-to-peer/$testP2PSessionId/data")
+                        .header(HttpHeaders.COOKIE, cookie.toString())
+                        .build()
+                    , MutableList::class.java
+                )
+
+                assertEquals(response.body!![0].toString(), presentationResponseJsonCleaned)
             }
 
 
             @Nested
             inner class User2Flow {
 
-                // Ändra så att det blir PPID?
                 @BeforeEach
                 fun `Setup cookie for user 2`() {
                     val response = testRestTemplate.exchange(
@@ -379,25 +419,17 @@ class P2PApiTest {
                                 .header(HttpHeaders.COOKIE, cookie.toString()).build(), String::class.java
                         )
 
-                        println("response: $response")
-
                         val responseInJson = response.toJsonNode()
 
                         assertEquals(200, response.statusCode.value())
-                        assertEquals("\"truid.app/claim/email/v1\"", responseInJson[0][0].get("type").toString())
-                        assertEquals("\"user-1@example.com\"", responseInJson[0][0].get("value").toString())
-                        assertEquals("\"truid.app/claim/bithdate/v1\"", responseInJson[0][1].get("type").toString())
-                        assertEquals("\"1111-11-11\"", responseInJson[0][1].get("value").toString())
-                        assertEquals("\"truid.app/claim/email/v1\"", responseInJson[1][0].get("type").toString())
-                        assertEquals("\"user-2@example.com\"", responseInJson[1][0].get("value").toString())
-                        assertEquals("\"truid.app/claim/bithdate/v1\"", responseInJson[1][1].get("type").toString())
-                        assertEquals("\"2222-22-22\"", responseInJson[1][1].get("value").toString())
-
-//                      Gammal kod, såhär såg det ut innan, läs todoist för mer info
-//                        assertEquals(
-//                            " [{\"type\":\"truid.app/claim/email/v1\",\"value\":\"user-1@example.com\"},{\"type\":\"truid.app/claim/bithdate/v1\",\"value\":\"1111-11-11\"}] </br> [{\"type\":\"truid.app/claim/email/v1\",\"value\":\"user-2@example.com\"},{\"type\":\"truid.app/claim/bithdate/v1\",\"value\":\"2222-22-22\"}] </br>",
-//                            response.body
-//                        )
+                        assertEquals("\"truid.app/claim/email/v1\"", responseInJson[0].get("claims")[0].get("type").toString())
+                        assertEquals("\"user-1@example.com\"", responseInJson[0].get("claims")[0].get("value").toString())
+                        assertEquals("\"truid.app/claim/bithdate/v1\"", responseInJson[0].get("claims")[1].get("type").toString())
+                        assertEquals("\"1111-11-11\"", responseInJson[0].get("claims")[1].get("value").toString())
+                        assertEquals("\"truid.app/claim/email/v1\"", responseInJson[1].get("claims")[0].get("type").toString())
+                        assertEquals("\"user-2@example.com\"", responseInJson[1].get("claims")[0].get("value").toString())
+                        assertEquals("\"truid.app/claim/bithdate/v1\"", responseInJson[1].get("claims")[1].get("type").toString())
+                        assertEquals("\"2222-22-22\"", responseInJson[1].get("claims")[1].get("value").toString())
                     }
 
                     @Test
@@ -447,20 +479,15 @@ class P2PApiTest {
                         assertEquals(200, responseFour.statusCode.value())
                         val responseInJson = responseFour.toJsonNode()
 
-                        assertEquals("\"truid.app/claim/email/v1\"", responseInJson[0][0].get("type").toString())
-                        assertEquals("\"user-1@example.com\"", responseInJson[0][0].get("value").toString())
-                        assertEquals("\"truid.app/claim/bithdate/v1\"", responseInJson[0][1].get("type").toString())
-                        assertEquals("\"1111-11-11\"", responseInJson[0][1].get("value").toString())
-                        assertEquals("\"truid.app/claim/email/v1\"", responseInJson[1][0].get("type").toString())
-                        assertEquals("\"user-2@example.com\"", responseInJson[1][0].get("value").toString())
-                        assertEquals("\"truid.app/claim/bithdate/v1\"", responseInJson[1][1].get("type").toString())
-                        assertEquals("\"2222-22-22\"", responseInJson[1][1].get("value").toString())
+                        assertEquals("\"truid.app/claim/email/v1\"", responseInJson[0].get("claims")[0].get("type").toString())
+                        assertEquals("\"user-1@example.com\"", responseInJson[0].get("claims")[0].get("value").toString())
+                        assertEquals("\"truid.app/claim/bithdate/v1\"", responseInJson[0].get("claims")[1].get("type").toString())
+                        assertEquals("\"1111-11-11\"", responseInJson[0].get("claims")[1].get("value").toString())
+                        assertEquals("\"truid.app/claim/email/v1\"", responseInJson[1].get("claims")[0].get("type").toString())
+                        assertEquals("\"user-2@example.com\"", responseInJson[1].get("claims")[0].get("value").toString())
+                        assertEquals("\"truid.app/claim/bithdate/v1\"", responseInJson[1].get("claims")[1].get("type").toString())
+                        assertEquals("\"2222-22-22\"", responseInJson[1].get("claims")[1].get("value").toString())
 
-//                     Gammal kod, såhär såg det ut innan, läs todoist för mer info
-//                        assertEquals(
-//                            " [{\"type\":\"truid.app/claim/email/v1\",\"value\":\"user-1@example.com\"},{\"type\":\"truid.app/claim/bithdate/v1\",\"value\":\"1111-11-11\"}] </br> [{\"type\":\"truid.app/claim/email/v1\",\"value\":\"user-2@example.com\"},{\"type\":\"truid.app/claim/bithdate/v1\",\"value\":\"2222-22-22\"}] </br>",
-//                            responseFour.body
-//                        )
 
                         val invalidCookie = HttpCookie("Set-Cookie", "JSESSIONID=invalid")
 
