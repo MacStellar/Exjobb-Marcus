@@ -4,7 +4,9 @@ import com.fasterxml.jackson.databind.ObjectMapper
 import jakarta.servlet.http.Cookie
 import jakarta.servlet.http.HttpServletRequest
 import jakarta.servlet.http.HttpServletResponse
+import jakarta.servlet.http.HttpSession
 import jakarta.ws.rs.ForbiddenException
+import org.apache.http.HttpResponse
 import org.apache.http.client.utils.URIBuilder
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.http.HttpEntity
@@ -50,7 +52,6 @@ class TrupalPeerToPeer(
     @Value("\${web.signup.failure}")
     val webFailure: URI,
 
-    val map: ObjectMapper,
     val sessionDB: SessionRepository,
     val userSessionDB: UserSessionRepository,
     val userTokenDB: UserTokenRepository,
@@ -64,48 +65,20 @@ class TrupalPeerToPeer(
         request: HttpServletRequest,
         @RequestHeader("X-Requested-With") xRequestedWith: String?,
     ): Void? {
-        val session = request.session
-
-        val userId = session.getAttribute("userId") as String?
-        if (userId != null) {
-            clearPersistence(userId)
-        }
 
         // Saves a session to the database
         val p2pSession = sessionDB.save(Session(null, "CREATED", Instant.now()))
-        session.setAttribute("p2pSessionId", "${p2pSession.id}")
+        request.session.setAttribute("p2pSessionId", "${p2pSession.id}")
 
-        val truidSignupUrl = URIBuilder(truidSignupEndpoint)
-            .addParameter("response_type", "code")
-            .addParameter("client_id", clientId)
-            .addParameter("scope", "truid.app/data-point/email truid.app/data-point/birthdate")
-            .addParameter("redirect_uri", createP2PSessionUri)
-            .addParameter("state", createOauth2State(session))
-            .addParameter("code_challenge", createOauth2CodeChallenge(session))
-            .addParameter("code_challenge_method", "S256")
-            .build()
+        // Initiates authorization and redirects user to truid signup
+        initiateAuthorization(request, response, xRequestedWith, createP2PSessionUri)
 
-        request.session.setAttribute("oauth2-state", createOauth2State(session))
-
-//        Setting redirect link
-        response.setHeader("Location", truidSignupUrl.toString())
-
-//        Check if app or browser
-        if (xRequestedWith == "XMLHttpRequest") {
-            // Return a 202 response in case of an AJAX request
-            response.status = HttpServletResponse.SC_ACCEPTED
-        } else {
-            // Return a 302 response in case of browser redirect
-            // Eventuellt gör om till 303
-            response.status = HttpServletResponse.SC_FOUND
-        }
         return null
     }
 
-    // Checks if signup went well
-    // Get token and fetch presentation
-    // Creates a session and sets id in http session
     // User redirects here after authorization at truid
+    // Get token and fetch presentation
+    // Creates a session and sets p2pSessionId in session on server-side
     // Fetch presentation and return link that user 1 can share
     @GetMapping("/truid/v1/peer-to-peer/create")
     fun createPeerToPeerSession(
@@ -117,76 +90,24 @@ class TrupalPeerToPeer(
     ): Void? {
         val session = request.session
 
-        // Skriv ett test för när det inte finns någon session som cookie eller p2pSession i databasen
-        // Checks if user has a cookie for p2pSessionId and if the session exists in the database
         val p2pSessionId = session.getAttribute("p2pSessionId") as String? ?: throw SessionNotFound()
-        val p2pSession = sessionDB.findById(p2pSessionId).orElseThrow() {
+        val p2pSession = sessionDB.findById(p2pSessionId).orElseThrow {
             P2PSessionNotFound()
         }
 
-        if (error != null) {
-            throw Forbidden(error, "There was an authorization error")
-        }
-        if (!verifyOauth2State(session, state)) {
-            throw Forbidden("access_denied", "State does not match the expected value")
-        }
-
-        val userOneInfo: PresentationResponse?
-        val userOneId: String?
-        try {
-
-            val body = LinkedMultiValueMap<String, String>()
-            body.add("grant_type", "authorization_code")
-            body.add("code", code)
-            body.add("redirect_uri", createP2PSessionUri)
-            body.add("client_id", clientId)
-            body.add("client_secret", clientSecret)
-            body.add("code_verifier", getOauth2CodeVerifier(session))
-
-            //Get token
-            val tokenResponse =
-                restTemplate.postForEntity<TokenResponse>(truidTokenEndpoint, body, TokenResponse::class)
-
-            // Get user info and set userId in session
-            val getPresentationUri = URIBuilder(truidPresentationEndpoint)
-                .addParameter("claims", "truid.app/claim/email/v1,truid.app/claim/birthdate/v1")
-                .build()
-
-            //Create entity with header including access token
-            val header = HttpHeaders()
-            header.contentType = MediaType.APPLICATION_JSON
-            header.setBearerAuth(tokenResponse.body!!.accessToken)
-            val entity = HttpEntity<String>(header)
-
-            userOneInfo = restTemplate.exchange(
-                getPresentationUri,
-                HttpMethod.GET,
-                entity,
-                PresentationResponse::class.java
-            ).body
-
-            userOneId = userOneInfo?.sub.toString()
-            session.setAttribute("userId", userOneId)
-
-            //Persist the refresh token
-            persist(tokenResponse.body, userOneId)
-        } catch (e: ForbiddenException) {
-            throw Forbidden("access_denied", e.message)
-        }
+        val (userId, userInfo) = getInitialPresentation(code, state, error, session, createP2PSessionUri)
 
         // Set status of session to INITIATED
         p2pSession.status = "INITIATED"
         sessionDB.save(p2pSession)
-
-        println("userOneInfo: $userOneInfo")
 
         // Saves a user session to the database
         userSessionDB.save(
             UserSession(
                 null,
                 p2pSessionId,
-                userOneId,
-                userOneInfo,
+                userId,
+                userInfo,
                 Instant.now()
             )
         )
@@ -197,8 +118,7 @@ class TrupalPeerToPeer(
         return null
     }
 
-    // Inkludera polling på denna sidan
-    // Ha så att p2pSessionID sparas i session istället?
+    // Inkludera polling på denna sida
     // First user is redirected here after creating and joining the p2p session.
     @GetMapping("/truid/v1/peer-to-peer/{sessionId}/share")
     fun sharePeerToPeerSession(
@@ -207,11 +127,8 @@ class TrupalPeerToPeer(
         request: HttpServletRequest,
         @RequestHeader("X-Requested-With") xRequestedWith: String?,
     ): String? {
-
-
-        return "http://localhost:8080/truid/v1/peer-to-peer/${p2pSessionId}/init-join </br> http://localhost:8080/truid/v1/peer-to-peer/${p2pSessionId}/data"
+        return "Send this to your friend: http://localhost:8080/truid/v1/peer-to-peer/${p2pSessionId}/init-join </br> See the data of p2p-session: http://localhost:8080/truid/v1/peer-to-peer/${p2pSessionId}/data"
     }
-
 
     // Second user enters here. Set cookie and redirect to truid
     @GetMapping("/truid/v1/peer-to-peer/{sessionId}/init-join")
@@ -221,41 +138,29 @@ class TrupalPeerToPeer(
         request: HttpServletRequest,
         @RequestHeader("X-Requested-With") xRequestedWith: String?,
     ): Void? {
+
         // Check if session and userSessions exist for the given p2pSessionId
-        sessionDB.findById(p2pSessionId).orElseThrow() {
+        val p2pSession = sessionDB.findById(p2pSessionId).orElseThrow() {
             P2PSessionNotFound()
         }
-        val userSessions = userSessionDB.getUserSessionsBySessionId(p2pSessionId)
+        val userId = request.session.getAttribute("userId") as String?
+
+        if (p2pSession.status == "INITIALIZED") {
+            throw RuntimeException("Session has not been created yet")
+        }
+        if (p2pSession.status == "FAILED") {
+            throw RuntimeException("Session has failed")
+        }
+        if (userId != null) {
+            response.status = 302
+            response.setHeader("Location", "http://localhost:8080/truid/v1/peer-to-peer/${p2pSessionId}/data")
+            return null
+        }
 
         request.session.setAttribute("p2pSessionId", p2pSessionId)
 
-        val session = request.session
-        clearPersistence(session.id)
-
-        val truidSignupUrl = URIBuilder(truidSignupEndpoint)
-            .addParameter("response_type", "code")
-            .addParameter("client_id", clientId)
-            .addParameter("scope", "truid.app/data-point/email truid.app/data-point/birthdate")
-            .addParameter("redirect_uri", joinP2PSessionUri)
-            .addParameter("state", createOauth2State(session))
-            .addParameter("code_challenge", createOauth2CodeChallenge(session))
-            .addParameter("code_challenge_method", "S256")
-            .build()
-
-        request.session.setAttribute("oauth2-state", createOauth2State(session))
-
-//        Setting redirect link
-        response.setHeader("Location", truidSignupUrl.toString())
-
-//        Check if app or browser
-        if (xRequestedWith == "XMLHttpRequest") {
-            // Return a 202 response in case of an AJAX request
-            response.status = HttpServletResponse.SC_ACCEPTED
-        } else {
-            // Return a 302 response in case of browser redirect
-            // Eventuellt gör om till 303
-            response.status = HttpServletResponse.SC_FOUND
-        }
+        // Initiates authorization and redirects user to Truid signup
+        initiateAuthorization(request, response, xRequestedWith, joinP2PSessionUri)
 
         return null
     }
@@ -277,77 +182,33 @@ class TrupalPeerToPeer(
         val p2pSession = sessionDB.findById(p2pSessionId).orElseThrow() {
             P2PSessionNotFound()
         }
-        val userSessions =
-            userSessionDB.getUserSessionsBySessionId(p2pSessionId) as List<UserSession>? ?: throw UserSessionsNotFound()
 
-        if (p2pSession.status.equals("INITIALIZED")) {
-            throw RuntimeException("Session has no other member")
+        if (p2pSession.status == "INITIALIZED") {
+            response.status = HttpServletResponse.SC_BAD_REQUEST
+            response.writer.print("P2P-Session has not been created")
+            return null
+        }
+        if (p2pSession.status == "FAILED") {
+            throw RuntimeException("P2P-Session has failed")
         }
 
+        val (userId, userInfo) = getInitialPresentation(code, state, error, session, joinP2PSessionUri)
 
-        if (error != null) {
-            throw Forbidden(error, "There was an authorization error")
-        }
-        if (!verifyOauth2State(session, state)) {
-            throw Forbidden("access_denied", "State does not match the expected value")
-        }
-
-        val userTwoInfo: PresentationResponse?
-        val userTwoId: String?
-        try {
-
-            val body = LinkedMultiValueMap<String, String>()
-            body.add("grant_type", "authorization_code")
-            body.add("code", code)
-            body.add("redirect_uri", joinP2PSessionUri)
-            body.add("client_id", clientId)
-            body.add("client_secret", clientSecret)
-            body.add("code_verifier", getOauth2CodeVerifier(session))
-
-            //Get token
-            val tokenResponse =
-                restTemplate.postForEntity<TokenResponse>(truidTokenEndpoint, body, TokenResponse::class)
-
-            // Get user info and set userId in session
-            val getPresentationUri = URIBuilder(truidPresentationEndpoint)
-                .addParameter("claims", "truid.app/claim/email/v1,truid.app/claim/birthdate/v1")
-                .build()
-
-            //Create entity with header including access token
-            val header = HttpHeaders()
-            header.contentType = MediaType.APPLICATION_JSON
-            header.setBearerAuth(tokenResponse.body!!.accessToken)
-            val entity = HttpEntity<String>(header)
-
-            userTwoInfo = restTemplate.exchange(
-                getPresentationUri,
-                HttpMethod.GET,
-                entity,
-                PresentationResponse::class.java
-            ).body
-
-            userTwoId = userTwoInfo?.sub.toString()
-            session.setAttribute("userId", userTwoId)
-
-            //Persist the refresh token
-            persist(tokenResponse.body, userTwoId)
-        } catch (e: ForbiddenException) {
-            throw Forbidden("access_denied", e.message)
-        }
-
-        if (userSessionDB.existsUserSessionsBySessionIdAndUserId(p2pSessionId, request.session.id)) {
+        if (userSessionDB.existsUserSessionsBySessionIdAndUserId(p2pSessionId, userId)) {
             response.status = 302
             response.setHeader("Location", "http://localhost:8080/truid/v1/peer-to-peer/${p2pSessionId}/data")
-        } else if (p2pSession.status.equals("COMPLETED")) {
-            throw SessionAlreadyComplete()
+        } else if (p2pSession.status == "COMPLETED") {
+            response.status = HttpServletResponse.SC_BAD_REQUEST
+            response.writer.print("P2P-Session is full")
+            return null
         }
 
         userSessionDB.save(
             UserSession(
                 null,
                 p2pSessionId,
-                userTwoId,
-                userTwoInfo,
+                userId,
+                userInfo,
                 Instant.now()
             )
         )
@@ -382,9 +243,6 @@ class TrupalPeerToPeer(
         response: HttpServletResponse,
         request: HttpServletRequest
     ): MutableList<PresentationResponse>? {
-        // Get PPID from server side session connected to cookie
-        // Check if PPID is connected to any of the userSessions connected to the session
-        // Return data from both users if TRUE
         val session = request.session
 
         sessionDB.findById(p2pSessionId).orElseThrow() {
@@ -416,8 +274,6 @@ class TrupalPeerToPeer(
                 throw Forbidden("access_denied", "User not part of session")
             }
         }
-
-        println("userData: ${userData[0].userPresentation}")
 
         val userPresentations = mutableListOf<PresentationResponse>()
 
@@ -456,51 +312,100 @@ class TrupalPeerToPeer(
         }
     }
 
-    private fun getPresentation(userId: String): PresentationResponse? {
+    private fun initiateAuthorization(request: HttpServletRequest, response: HttpServletResponse,xRequestedWith: String?, redirect: String?) {
+        val session = request.session
 
-        //Get the access token
-        val accessToken = refreshToken(userId)
-
-        val getPresentationUri = URIBuilder(truidPresentationEndpoint)
-            .addParameter("claims", "truid.app/claim/email/v1,truid.app/claim/birthdate/v1")
-            .build()
-
-        //Create entity with header including access token
-        val header = HttpHeaders()
-        header.contentType = MediaType.APPLICATION_JSON
-        header.setBearerAuth(accessToken)
-        val entity = HttpEntity<String>(header)
-
-        return restTemplate.exchange(
-            getPresentationUri,
-            HttpMethod.GET,
-            entity,
-            PresentationResponse::class.java
-        ).body
-    }
-
-    private fun refreshToken(userId: String?): String {
-
-        val refreshToken = getPersistedToken(userId) ?: throw Forbidden("access_denied", "No refresh_token found")
-
-        val body = LinkedMultiValueMap<String, String>()
-        body.add("grant_type", "refresh_token")
-        body.add("refresh_token", refreshToken)
-        body.add("client_id", clientId)
-        body.add("client_secret", clientSecret)
-
-        val refreshedTokenResponse =
-            restTemplate.postForEntity<TokenResponse>(truidTokenEndpoint, body, TokenResponse::class).body
-
-        persist(refreshedTokenResponse, userId)
-
-        if (refreshedTokenResponse == null) {
-            throw Forbidden("access_denied", "No token response found")
-        } else {
-            return refreshedTokenResponse.accessToken
+        val userId = request.session.getAttribute("userId") as String?
+        if (userId != null) {
+            clearPersistence(userId)
         }
 
+        val truidSignupUrl = URIBuilder(truidSignupEndpoint)
+            .addParameter("response_type", "code")
+            .addParameter("client_id", clientId)
+            .addParameter("scope", "truid.app/data-point/email truid.app/data-point/birthdate")
+            .addParameter("redirect_uri", redirect)
+            .addParameter("state", createOauth2State(session))
+            .addParameter("code_challenge", createOauth2CodeChallenge(session))
+            .addParameter("code_challenge_method", "S256")
+            .build()
+
+        session.setAttribute("oauth2-state", createOauth2State(session))
+
+//        Setting redirect link
+        response.setHeader("Location", truidSignupUrl.toString())
+
+//        Check if app or browser
+        if (xRequestedWith == "XMLHttpRequest") {
+            // Return a 202 response in case of an AJAX request
+            response.status = HttpServletResponse.SC_ACCEPTED
+        } else {
+            // Return a 302 response in case of browser redirect
+            // Eventuellt gör om till 303
+            response.status = HttpServletResponse.SC_FOUND
+        }
+
+        session.setAttribute("oauth2-state", createOauth2State(session))
     }
+
+    private fun getInitialPresentation(code: String?, state: String?, error: String?, session: HttpSession, redirect: String?): Pair<String?, PresentationResponse?> {
+        val userId: String?
+        val userInfo: PresentationResponse?
+
+        if (error != null) {
+            throw Forbidden(error, "There was an authorization error")
+        }
+        if (!verifyOauth2State(session, state)) {
+            throw Forbidden("access_denied", "State does not match the expected value")
+        }
+
+        try {
+
+            val body = LinkedMultiValueMap<String, String>()
+            body.add("grant_type", "authorization_code")
+            body.add("code", code)
+            body.add("redirect_uri", redirect)
+            body.add("client_id", clientId)
+            body.add("client_secret", clientSecret)
+            body.add("code_verifier", getOauth2CodeVerifier(session))
+
+            //Get token
+            val tokenResponse =
+                restTemplate.postForEntity<TokenResponse>(truidTokenEndpoint, body, TokenResponse::class)
+
+            // Get user info and set userId in session
+            val getPresentationUri = URIBuilder(truidPresentationEndpoint)
+                .addParameter("claims", "truid.app/claim/email/v1,truid.app/claim/birthdate/v1")
+                .build()
+
+            //Create entity with header including access token
+            val header = HttpHeaders()
+            header.contentType = MediaType.APPLICATION_JSON
+            header.setBearerAuth(tokenResponse.body!!.accessToken)
+            val entity = HttpEntity<String>(header)
+
+            userInfo = restTemplate.exchange(
+                getPresentationUri,
+                HttpMethod.GET,
+                entity,
+                PresentationResponse::class.java
+            ).body
+
+            userId = userInfo?.sub.toString()
+            session.setAttribute("userId", userId)
+
+            //Persist the refresh token
+            persist(tokenResponse.body, userId)
+        } catch (e: ForbiddenException) {
+            throw Forbidden("access_denied", e.message)
+        }
+
+        val pair: Pair<String?, PresentationResponse?> = userId to userInfo
+
+        return pair
+    }
+
+    // Removed refreshToken function
 
     private fun clearPersistence(userId: String?) {
 

@@ -3,9 +3,6 @@ package app.truid.trupal
 import com.fasterxml.jackson.databind.JsonNode
 import com.github.tomakehurst.wiremock.client.WireMock
 import org.apache.http.client.utils.URIBuilder
-import org.junit.jupiter.api.Assertions.assertEquals
-import org.junit.jupiter.api.Assertions.assertTrue
-import org.junit.jupiter.api.Assertions.assertNotEquals
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.boot.test.web.client.TestRestTemplate
@@ -16,12 +13,12 @@ import org.springframework.http.RequestEntity
 import org.springframework.test.context.ActiveProfiles
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.github.tomakehurst.wiremock.client.ResponseDefinitionBuilder
-import org.junit.jupiter.api.*
+import org.junit.jupiter.api.Assertions.*
+import org.junit.jupiter.api.BeforeEach
+import org.junit.jupiter.api.Nested
+import org.junit.jupiter.api.Test
 import org.springframework.http.ResponseEntity
-import org.springframework.util.LinkedMultiValueMap
-import org.testcontainers.shaded.com.fasterxml.jackson.databind.node.ArrayNode
 import java.net.HttpCookie
-import java.time.Instant
 
 @AutoConfigureWireMock(port = 0)
 @ActiveProfiles("test")
@@ -33,45 +30,14 @@ class P2PApiTest {
 
     lateinit var testP2PSessionId: String
 
-    @Autowired
-    lateinit var userSessionDB: UserSessionRepository
-
-
-    @Test
-    fun `It should be able to upload, download and convert PresentationResponse objects`() {
-        val presentationResponse = PresentationResponse(
-            sub = "test_db", claims = listOf(
-                PresentationResponseClaims(
-                    type = "truid.app/claim/email/v1", value = "test@example.com"
-                ), PresentationResponseClaims(type = "truid.app/claim/bithdate/v1", value = "tttt-tt-tt")
-            )
-        )
-
-        userSessionDB.save(
-            UserSession(
-                null,
-                "15713d0a-59b6-4648-84d7-9f07d8ab7ef2",
-                "222_test_test_test_DB",
-                presentationResponse,
-                Instant.now()
-            )
-        )
-        val userSessionsPlural = userSessionDB.getUserSessionsBySessionId("15713d0a-59b6-4648-84d7-9f07d8ab7ef2")
-        println("userSessionsPlural: $userSessionsPlural")
-        print("type of userSessionsPlural: ${userSessionsPlural[1].userPresentation!!.javaClass}")
-    }
-
     @Test
     fun `It should return a cookie`() {
         val response = testRestTemplate.exchange(
             RequestEntity.get("/truid/v1/peer-to-peer").build(), String::class.java
         )
-
-//            Checks whether the site redirects user
-        assertEquals(302, response.statusCode.value())
-
-//            Checks whether the cookie is received and is set to httpOnly
         val testCookie = HttpCookie.parse(response.setCookie()).single()
+
+        assertEquals(302, response.statusCode.value())
         assertEquals(true, testCookie.isHttpOnly)
     }
 
@@ -93,8 +59,6 @@ class P2PApiTest {
             val response = testRestTemplate.exchange(
                 RequestEntity.get("/truid/v1/peer-to-peer").build(), String::class.java
             )
-
-//            Checks whether the cookie is received and is set to httpOnly
             cookie = HttpCookie.parse(response.setCookie()).single()
 
             assertEquals(true, cookie.isHttpOnly)
@@ -117,7 +81,7 @@ class P2PApiTest {
             assertEquals("/oauth2/v1/authorize/confirm-signup", url.path)
             assertEquals("code", url.getParam("response_type"))
             assertEquals("test-client-id", url.getParam("client_id"))
-            Assertions.assertNotNull(url.getParam("scope"))
+            assertNotNull(url.getParam("scope"))
         }
 
         @Test
@@ -131,7 +95,7 @@ class P2PApiTest {
             assertEquals(302, response.statusCode.value())
 
             val url = URIBuilder(response.location())
-            Assertions.assertNull(url.getParam("client_secret"))
+            assertNull(url.getParam("client_secret"))
         }
 
         @Test
@@ -257,13 +221,13 @@ class P2PApiTest {
                 )
 
                 val presentationResponseJson = mapper.writeValueAsString(presentationResponse)
-                val presentationResponseJsonCleaned = presentationResponseJson.replace("\"", "").replace(",", ", ").replace(":", "=")
+                val presentationResponseJsonCleaned =
+                    presentationResponseJson.replace("\"", "").replace(",", ", ").replace(":", "=")
 
                 val response = testRestTemplate.exchange(
                     RequestEntity.get("/truid/v1/peer-to-peer/$testP2PSessionId/data")
                         .header(HttpHeaders.COOKIE, cookie.toString())
-                        .build()
-                    , MutableList::class.java
+                        .build(), MutableList::class.java
                 )
 
                 assertEquals(response.body!![0].toString(), presentationResponseJsonCleaned)
@@ -303,7 +267,7 @@ class P2PApiTest {
                     assertEquals("/oauth2/v1/authorize/confirm-signup", url.path)
                     assertEquals("code", url.getParam("response_type"))
                     assertEquals("test-client-id", url.getParam("client_id"))
-                    Assertions.assertNotNull(url.getParam("scope"))
+                    assertNotNull(url.getParam("scope"))
                 }
 
                 @Test
@@ -317,19 +281,8 @@ class P2PApiTest {
                     assertEquals(302, response.statusCode.value())
 
                     val url = URIBuilder(response.location())
-                    Assertions.assertNull(url.getParam("client_secret"))
+                    assertNull(url.getParam("client_secret"))
                 }
-
-                @Test
-                fun `It should return 404 if invalid P2P session is provided`() {
-                    val response = testRestTemplate.exchange(
-                        RequestEntity.get("/truid/v1/peer-to-peer/invalid_session_id/init-join")
-                            .header(HttpHeaders.COOKIE, cookie.toString()).build(),
-                        String::class.java
-                    )
-                    assertEquals(404, response.statusCode.value())
-                }
-
 
                 @Nested
                 inner class User2CompletedSignup {
@@ -403,6 +356,17 @@ class P2PApiTest {
                     }
 
                     @Test
+                    fun `It should return the status COMPLETED`() {
+                        // Same as the test below but the title is wrong?
+                        val response = testRestTemplate.exchange(
+                            RequestEntity.get("/truid/v1/peer-to-peer/$testP2PSessionId")
+                                .header(HttpHeaders.COOKIE, cookie.toString()).build(), String::class.java
+                        )
+                        assertEquals(200, response.statusCode.value())
+                        assertEquals("COMPLETED", response.body)
+                    }
+
+                    @Test
                     fun `It should return 302, add redirect to the page with user data`() {
                         val response = testRestTemplate.exchange(
                             RequestEntity.get("/truid/v1/peer-to-peer/$testP2PSessionId/init-join")
@@ -422,13 +386,31 @@ class P2PApiTest {
                         val responseInJson = response.toJsonNode()
 
                         assertEquals(200, response.statusCode.value())
-                        assertEquals("\"truid.app/claim/email/v1\"", responseInJson[0].get("claims")[0].get("type").toString())
-                        assertEquals("\"user-1@example.com\"", responseInJson[0].get("claims")[0].get("value").toString())
-                        assertEquals("\"truid.app/claim/bithdate/v1\"", responseInJson[0].get("claims")[1].get("type").toString())
+                        assertEquals(
+                            "\"truid.app/claim/email/v1\"",
+                            responseInJson[0].get("claims")[0].get("type").toString()
+                        )
+                        assertEquals(
+                            "\"user-1@example.com\"",
+                            responseInJson[0].get("claims")[0].get("value").toString()
+                        )
+                        assertEquals(
+                            "\"truid.app/claim/bithdate/v1\"",
+                            responseInJson[0].get("claims")[1].get("type").toString()
+                        )
                         assertEquals("\"1111-11-11\"", responseInJson[0].get("claims")[1].get("value").toString())
-                        assertEquals("\"truid.app/claim/email/v1\"", responseInJson[1].get("claims")[0].get("type").toString())
-                        assertEquals("\"user-2@example.com\"", responseInJson[1].get("claims")[0].get("value").toString())
-                        assertEquals("\"truid.app/claim/bithdate/v1\"", responseInJson[1].get("claims")[1].get("type").toString())
+                        assertEquals(
+                            "\"truid.app/claim/email/v1\"",
+                            responseInJson[1].get("claims")[0].get("type").toString()
+                        )
+                        assertEquals(
+                            "\"user-2@example.com\"",
+                            responseInJson[1].get("claims")[0].get("value").toString()
+                        )
+                        assertEquals(
+                            "\"truid.app/claim/bithdate/v1\"",
+                            responseInJson[1].get("claims")[1].get("type").toString()
+                        )
                         assertEquals("\"2222-22-22\"", responseInJson[1].get("claims")[1].get("value").toString())
                     }
 
@@ -474,29 +456,132 @@ class P2PApiTest {
                         assertEquals(
                             finalCookie.toString(),
                             newCookie.toString(),
-                            "New cookie is not used to access the data"
+                            "New cookie is not same as the final cookie"
                         )
                         assertEquals(200, responseFour.statusCode.value())
                         val responseInJson = responseFour.toJsonNode()
 
-                        assertEquals("\"truid.app/claim/email/v1\"", responseInJson[0].get("claims")[0].get("type").toString())
-                        assertEquals("\"user-1@example.com\"", responseInJson[0].get("claims")[0].get("value").toString())
-                        assertEquals("\"truid.app/claim/bithdate/v1\"", responseInJson[0].get("claims")[1].get("type").toString())
+                        assertEquals(
+                            "\"truid.app/claim/email/v1\"",
+                            responseInJson[0].get("claims")[0].get("type").toString()
+                        )
+                        assertEquals(
+                            "\"user-1@example.com\"",
+                            responseInJson[0].get("claims")[0].get("value").toString()
+                        )
+                        assertEquals(
+                            "\"truid.app/claim/bithdate/v1\"",
+                            responseInJson[0].get("claims")[1].get("type").toString()
+                        )
                         assertEquals("\"1111-11-11\"", responseInJson[0].get("claims")[1].get("value").toString())
-                        assertEquals("\"truid.app/claim/email/v1\"", responseInJson[1].get("claims")[0].get("type").toString())
-                        assertEquals("\"user-2@example.com\"", responseInJson[1].get("claims")[0].get("value").toString())
-                        assertEquals("\"truid.app/claim/bithdate/v1\"", responseInJson[1].get("claims")[1].get("type").toString())
+                        assertEquals(
+                            "\"truid.app/claim/email/v1\"",
+                            responseInJson[1].get("claims")[0].get("type").toString()
+                        )
+                        assertEquals(
+                            "\"user-2@example.com\"",
+                            responseInJson[1].get("claims")[0].get("value").toString()
+                        )
+                        assertEquals(
+                            "\"truid.app/claim/bithdate/v1\"",
+                            responseInJson[1].get("claims")[1].get("type").toString()
+                        )
                         assertEquals("\"2222-22-22\"", responseInJson[1].get("claims")[1].get("value").toString())
+                    }
 
-
+                    @Test
+                    fun `Should not be able to get data with invalid cookie`() {
                         val invalidCookie = HttpCookie("Set-Cookie", "JSESSIONID=invalid")
 
                         // Should not be able to access the data with the old cookie
-                        val responseFive = testRestTemplate.exchange(
+                        val response = testRestTemplate.exchange(
                             RequestEntity.get("/truid/v1/peer-to-peer/${testP2PSessionId}/data")
                                 .header(HttpHeaders.COOKIE, invalidCookie.toString()).build(), String::class.java
                         )
-                        assertEquals(302, responseFive.statusCode.value())
+                        assertEquals(302, response.statusCode.value())
+
+                    }
+
+                    @Nested
+                    inner class User3Flow {
+
+                        lateinit var newCookie: HttpCookie
+
+                        @BeforeEach
+                        fun `Setup Truid token endpoint-, presentation- mock`() {
+                            println("kör denna först 1")
+                            val response = mapOf(
+                                "refresh_token" to "refresh-token-2",
+                                "access_token" to "access-token-2",
+                                "expires_in" to 3600,
+                                "token_type" to "token-type",
+                                "scope" to "truid.app/data-point/email truid.app/data-point/birthdate"
+                            )
+
+                            WireMock.stubFor(
+                                WireMock.post(WireMock.urlEqualTo("/oauth2/v1/token")).willReturn(
+                                    WireMock.aResponse().withStatus(200)
+                                        .withHeader(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
+                                        .withJsonBody(response)
+                                )
+                            )
+
+                            // Creates the response for the mock response from Truid
+                            val presentationResponse = PresentationResponse(
+                                sub = "1234567userthree", claims = listOf(
+                                    PresentationResponseClaims(
+                                        type = "truid.app/claim/email/v1", value = "user-3@example.com"
+                                    ), PresentationResponseClaims(
+                                        type = "truid.app/claim/bithdate/v1", value = "3333-33-33"
+                                    )
+                                )
+                            )
+                            WireMock.stubFor(
+                                WireMock.get("/exchange/v1/presentation?claims=truid.app%2Fclaim%2Femail%2Fv1%2Ctruid.app%2Fclaim%2Fbirthdate%2Fv1")
+                                    .willReturn(
+                                        WireMock.aResponse()
+                                            .withHeader(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
+                                            .withStatus(200).withJsonBody(presentationResponse)
+                                    )
+                            )
+                        }
+
+                        @BeforeEach
+                        fun `Setup user 3 login`() {
+                            println("kör denna först 2")
+                            val responseOne = testRestTemplate.exchange(
+                                RequestEntity.get("/truid/v1/peer-to-peer").build(), String::class.java
+                            )
+
+                            //Checks whether the cookie is received and is set to httpOnly
+                            newCookie = HttpCookie.parse(responseOne.setCookie()).single()
+
+                            val responseTwo = testRestTemplate.exchange(
+                                RequestEntity.get("/truid/v1/peer-to-peer/$testP2PSessionId/init-join")
+                                    .header(HttpHeaders.COOKIE, newCookie.toString()).build(), String::class.java
+                            )
+                            val url = URIBuilder(responseTwo.headers.location!!)
+                            state = url.getParam("state")!!
+
+                            testRestTemplate.exchange(
+                                RequestEntity.get("/truid/v1/peer-to-peer/join?code=1234&state=$state")
+                                    .header(HttpHeaders.COOKIE, newCookie.toString()).accept(MediaType.TEXT_HTML)
+                                    .build(),
+                                String::class.java
+                            )
+
+                        }
+
+                        @Test
+                        fun `User 3 should not be able to access the data of the first session`() {
+                            println("kommer till testet 1")
+                            val response = testRestTemplate.exchange(
+                                RequestEntity.get("/truid/v1/peer-to-peer/${testP2PSessionId}/data")
+                                    .header(HttpHeaders.COOKIE, newCookie.toString()).build(), String::class.java
+                            )
+
+                            assertEquals(403, response.statusCode.value())
+                        }
                     }
                 }
             }

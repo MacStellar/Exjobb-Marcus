@@ -13,4 +13,4 @@ class P2PSessionNotFound(message: String? = null, cause: Throwable? = null) : Ex
 
 class UserSessionsNotFound(message: String? = null, cause: Throwable? = null) : Exception(message)
 
-class SessionAlreadyComplete() : Exception()
+class SessionAlreadyComplete() : Exception("Session is already complete")
