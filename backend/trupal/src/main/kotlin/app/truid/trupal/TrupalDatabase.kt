@@ -14,27 +14,15 @@ import java.time.Instant
 @Repository
 interface SessionRepository : CrudRepository<Session, String> {
 
-    fun existsSessionById(id: String?): Boolean
-
-    fun getSessionById(id: String?): Session?
-
     @Query("select status from session where id = :id")
     fun getStatusById(id: String?): String?
-
 }
 
 @Repository
 interface UserSessionRepository : CrudRepository<UserSession, String> {
     fun getUserSessionsBySessionId(id: String?): List<UserSession>
 
-    fun existsUserSessionBySessionId(id: String?): Boolean
-
     fun existsUserSessionsBySessionIdAndUserId(session_id: String?, user_id: String?): Boolean
-
-    @Modifying
-    @Query("delete from user_session o where o.session_id = :session_id")
-    fun deleteUserSessionBySessionId(session_id: String?)
-
 }
 
 @Repository

@@ -15,33 +15,38 @@ data class TokenResponse(
     val expiresIn: Long,
     @JsonProperty("token_type")
     val tokenType: String,
-    val scope: String
+    val scope: String,
 )
 
 data class PresentationResponseList(
-    val presentations: List<PresentationResponse>
+    val presentations: List<PresentationResponse>,
 )
 
 data class PresentationResponse(
     val sub: String,
-    val claims: List<PresentationResponseClaims>
+    val claims: List<PresentationResponseClaims>,
 )
 
 data class PresentationResponseClaims(
     val type: String,
-    val value: String
-) {
+    val value: String,
+)
+
+enum class SessionStatus {
+    INITIALIZED,
+    CREATED,
+    FAILED,
+    COMPLETED,
 }
 
 @Table("session")
 data class Session(
     @Id var id: String?,
     @Column("status")
-    var status: String,
+    var status: SessionStatus,
     @Column("created")
-    val created: Instant
+    val created: Instant,
 )
-
 
 @Table("user_session")
 data class UserSession(
@@ -51,13 +56,10 @@ data class UserSession(
     @Column("user_id")
     val userId: String?,
     @Column("user_presentation")
-//    @Convert(converter = PresentationResponseAttributeConverter::class)
     val userPresentation: PresentationResponse?,
     @Column("created")
-    val created: Instant
-) {
-
-}
+    val created: Instant,
+)
 
 @Table("user_token")
 data class UserToken(
@@ -67,6 +69,5 @@ data class UserToken(
     @Column("refresh_token")
     val refreshToken: String?,
     @Column("created")
-    val created: Instant
+    val created: Instant,
 )
-

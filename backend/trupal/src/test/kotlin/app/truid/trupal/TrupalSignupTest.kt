@@ -21,24 +21,6 @@ import java.net.HttpCookie
 import org.apache.http.client.utils.URIBuilder
 import wiremock.com.fasterxml.jackson.databind.JsonNode
 
-//        testRestTemplate.exchange(
-//            RequestEntity.get("/truid/v1/complete-signup?code=1234")
-//                .header(HttpHeaders.COOKIE, cookie.toString())
-//                .build(),
-//            Map::class.java
-//        )
-
-//        println("cookie somewhere?: ${response.getHeader("Set-Cookie").split(";")[0].substringAfter("=")}")
-
-//        HttpCookie.parse(response.headers[HttpHeaders.SET_COOKIE]?.firstOrNull()).single()
-
-
-//        val mapper = ObjectMapper()
-//
-//        val jsongrej = mapper.writeValueAsString(TokenResponse("refresh-token", "access-token", 3600, "token-type", "scope"))
-//
-//        println("jsongrej: $jsongrej")
-
 @AutoConfigureWireMock(port = 0)
 @ActiveProfiles("test")
 @SpringBootTest(webEnvironment = RANDOM_PORT)

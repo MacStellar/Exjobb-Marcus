@@ -26,7 +26,6 @@ class DBConfig : AbstractJdbcConfiguration() {
 class PresentationResponseAttributeConverter {
 
 
-
     fun presentationWriteConverter() = Writer()
 
 
@@ -37,25 +36,17 @@ class PresentationResponseAttributeConverter {
 
 
         override fun convert(source: PresentationResponse): String {
-//            return PGobject().apply {
-//                type = "json"
-//                value = mapper.writeValueAsString(source)
-//            }
             return mapper.writeValueAsString(source)
-
         }
-
     }
 
     class Reader : Converter<String, PresentationResponse> {
         override fun convert(source: String): PresentationResponse? {
-//            return mapper.readValue(source.value, PresentationResponse::class.java)
-            try {
-                return mapper.readValue(source, PresentationResponse::class.java)
-            } catch (e: Exception) {
-//                log.
-//                Fixa en log grej
-                return null
+            return try {
+                mapper.readValue(source, PresentationResponse::class.java)
+            } catch (e: RuntimeException) {
+
+                null
             }
         }
     }
