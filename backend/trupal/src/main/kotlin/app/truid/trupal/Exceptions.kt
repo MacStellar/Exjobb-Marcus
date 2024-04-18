@@ -1,16 +1,17 @@
 package app.truid.trupal
 
-import org.springframework.http.HttpStatus
-import org.springframework.web.bind.annotation.ResponseStatus
-
 open class Forbidden(val error: String, message: String?, cause: Throwable? = null) : RuntimeException(message, cause)
-class Unauthorized(val error: String, message: String?) : RuntimeException(message)
 
-class SessionNotFound(message: String? = null, cause: Throwable? = null) : Exception(message)
+open class P2PSessionStatusException(message: String?, cause: Throwable? = null) :
+    RuntimeException(
+        message,
+        cause,
+    )
 
-@ResponseStatus(HttpStatus.NOT_FOUND)
-class P2PSessionNotFound(message: String? = null, cause: Throwable? = null) : Exception(message)
+open class CookieSessionNotFound(cause: Throwable? = null) :
+    RuntimeException("Cookie session not found on server-side", cause)
 
-class UserSessionsNotFound(message: String? = null, cause: Throwable? = null) : Exception(message)
+open class P2PSessionNotFound(cause: Throwable? = null) : RuntimeException("P2P session not found in database", cause)
 
-class SessionAlreadyComplete() : Exception("Session is already complete")
+open class UserSessionsNotFound(cause: Throwable? = null) :
+    RuntimeException("No users were found to be connected to the p2p session", cause)
