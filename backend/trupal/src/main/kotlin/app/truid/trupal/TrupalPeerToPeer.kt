@@ -42,6 +42,8 @@ class TrupalPeerToPeer(
     val truidTokenEndpoint: String,
     @Value("\${oauth2.truid.presentation-endpoint}")
     val truidPresentationEndpoint: String,
+    @Value("\${app.domain}")
+    val localDomain: String,
     @Value("\${web.signup.success}")
     val webSuccess: URI,
     @Value("\${web.signup.failure}")
@@ -191,7 +193,22 @@ class TrupalPeerToPeer(
         request: HttpServletRequest,
     ): Map<String, String>? {
         // TODO Configure host/add host in frontend
-        return mapOf("link" to "http://localhost:8080/truid/v1/peer-to-peer/$p2pSessionId/init-join")
+
+        val session = request.session
+
+        sessionDB.findById(p2pSessionId).orElseThrow {
+            P2PSessionNotFound()
+        }
+
+        val userId = session.getAttribute("userId") as String?
+        if (userId == null) {
+            throw Forbidden("access_denied", "User not logged in.")
+        }
+        if (!userSessionDB.existsUserSessionsBySessionIdAndUserId(p2pSessionId, userId)) {
+            throw Forbidden("access_denied", "Your user has not joined this session.")
+        }
+
+        return mapOf("link" to "$localDomain/truid/v1/peer-to-peer/$p2pSessionId/init-join")
     }
 
     // Second user enters here. Set cookie and redirect to truid
@@ -209,11 +226,27 @@ class TrupalPeerToPeer(
                 P2PSessionNotFound()
             }
 
-        if (p2pSession.status == SessionStatus.CREATED) {
-            throw P2PSessionStatusException("User one has not joined P2P session yet", null)
+        val userSessions = userSessionDB.getUserSessionsBySessionId(p2pSessionId)
+        if (userSessions.size > 1) {
+            throw P2PSessionStatusException("P2P-Session is full", null)
         }
-        if (p2pSession.status == SessionStatus.FAILED) {
-            throw P2PSessionStatusException("P2P-Session has failed", null)
+
+        if (userSessions.isEmpty()) {
+            throw P2PSessionStatusException("P2P-Session has not been created", null)
+        }
+        when (p2pSession.status) {
+            SessionStatus.INITIALIZED -> {} // Continue
+            SessionStatus.CREATED -> {
+                throw P2PSessionStatusException("P2P-session has not been joined by user 1 yet", null)
+            }
+
+            SessionStatus.FAILED -> {
+                throw P2PSessionStatusException("P2P-Session has failed", null)
+            }
+
+            SessionStatus.COMPLETED -> {
+                throw P2PSessionStatusException("P2P-Session is full", null)
+            }
         }
 
         session.setAttribute("p2pSessionId", p2pSessionId)
@@ -276,18 +309,26 @@ class TrupalPeerToPeer(
 
         val userSessions = userSessionDB.getUserSessionsBySessionId(p2pSessionId)
         if (userSessions.size > 1) {
-            // TODO
-//            throw
+            throw P2PSessionStatusException("P2P-Session is full", null)
         }
 
-        if (userSessions.size == 0) {
-            // TODO
-//            throw
+        if (userSessions.isEmpty()) {
+            throw P2PSessionStatusException("P2P-Session has not been created", null)
         }
 
-        if (p2pSession.status != SessionStatus.INITIALIZED) {
-            // TODO
-//            throw
+        when (p2pSession.status) {
+            SessionStatus.INITIALIZED -> {} // Continue
+            SessionStatus.CREATED -> {
+                throw P2PSessionStatusException("P2P-session has not been joined by user 1 yet", null)
+            }
+
+            SessionStatus.FAILED -> {
+                throw P2PSessionStatusException("P2P-Session has failed", null)
+            }
+
+            SessionStatus.COMPLETED -> {
+                throw P2PSessionStatusException("P2P-Session is full", null)
+            }
         }
 
         try {
@@ -365,7 +406,7 @@ class TrupalPeerToPeer(
 
         val userId = session.getAttribute("userId") as String?
         if (userId == null) {
-            throw Forbidden("access_denied", "User not logged in.")
+            throw CookieSessionNotFound()
         }
         if (!userSessionDB.existsUserSessionsBySessionIdAndUserId(p2pSessionId, userId)) {
             throw Forbidden("access_denied", "Your user has not joined this session.")
@@ -387,16 +428,11 @@ class TrupalPeerToPeer(
             P2PSessionNotFound()
         }
 
-        // If user is logged out, they are redirected to the join page to log in.
+        val userId = session.getAttribute("userId") as String? ?: throw CookieSessionNotFound()
+        val userData: List<UserSession>?
+
         // The process of checking is user has access to the session is done when
         // they have a user id in the session.
-        val userId = session.getAttribute("userId") as String?
-        if (userId == null) {
-            response.status = 302
-            response.setHeader("Location", "/truid/v1/peer-to-peer/$p2pSessionId/init-join")
-            return null
-        }
-        val userData: List<UserSession>?
         if (userSessionDB.existsUserSessionsBySessionIdAndUserId(p2pSessionId, userId)) {
             userData = userSessionDB.getUserSessionsBySessionId(p2pSessionId)
             if (userData.isEmpty()) {

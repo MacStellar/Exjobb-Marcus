@@ -15,3 +15,5 @@ open class P2PSessionNotFound(cause: Throwable? = null) : RuntimeException("P2P 
 
 open class UserSessionsNotFound(cause: Throwable? = null) :
     RuntimeException("No users were found to be connected to the p2p session", cause)
+
+open class PersonNotFound(cause: Throwable? = null) : RuntimeException("Person could not be found", cause)
