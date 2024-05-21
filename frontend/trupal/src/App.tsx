@@ -2,9 +2,18 @@ import { useState } from 'react'
 import reactLogo from './assets/react.svg'
 import viteLogo from '/vite.svg'
 import './App.css'
+import { Button } from "./components/ui/button"
+import { ListGroup } from "@/components/ListGroup.tsx"
+import { Textarea } from "@/components/ui/textarea"
+
 
 function App() {
-  const [count, setCount] = useState(0)
+  const [count, setCount] = useState(0);
+  let items = ["Stockholm", "Jönköping", "Enköping"];
+  const handleSelectItem = (value: string) => {
+      console.log("nu triggas den i app", value)
+  }
+
 
   return (
     <>
@@ -21,6 +30,12 @@ function App() {
         <button onClick={() => setCount((count) => count + 1)}>
           count is {count}
         </button>
+          <Button> New type of button</Button>
+          <ListGroup items={ items } heading="List header" onSelectItem={handleSelectItem}/>
+          <Textarea />
+          <br />
+
+          <p>hej</p>
         <p>
           Edit <code>src/App.tsx</code> and save to test HMR
         </p>

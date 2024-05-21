@@ -65,7 +65,7 @@ class P2PApiTest {
         }
 
         @Nested
-        inner class User1CompletedSignup {
+        inner class User1AfterSignup {
             lateinit var userOneCookie: HttpCookie
             lateinit var userOneState: String
 
@@ -152,7 +152,7 @@ class P2PApiTest {
             }
 
             @Nested
-            inner class BeforeUser2SignsUp {
+            inner class User2BeforeSignup {
                 lateinit var testP2PSessionId: String
                 lateinit var p2pSessionJoinUri: String
                 lateinit var userOnePresentationResponse: PresentationResponse
@@ -333,7 +333,7 @@ class P2PApiTest {
                 }
 
                 @Nested
-                inner class User2CompletedSignup {
+                inner class User2AfterSignup {
                     lateinit var userTwoCookie: HttpCookie
                     lateinit var userTwoState: String
                     lateinit var p2pSessionDataUri: String

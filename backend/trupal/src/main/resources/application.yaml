@@ -1,8 +1,8 @@
 spring:
   datasource:
     url: jdbc:postgresql://localhost:5432/trupal
-    username: ${POSTGRES_USERNAME:postgres}
-    password: ${POSTGRES_PASSWORD:password}
+    username: ${POSTGRES_USERNAME}
+    password: ${POSTGRES_PASSWORD}
   liquibase:
     change-log: classpath:db/db.changelog-master.yaml
 

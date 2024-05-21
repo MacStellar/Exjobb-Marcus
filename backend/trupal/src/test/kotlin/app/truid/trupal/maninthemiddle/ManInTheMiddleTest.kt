@@ -62,43 +62,50 @@ class ManInTheMiddleTest() {
         // Malice has created a fake profile on an insecure external communication channel
         // impersonating Bob. Alice reaches out to who she thinks is bob, but in fact is Malice
         aliceToMaliceChannel =
-            ExternalCommunicationChannel(personOne = alice, personTwo = malice, impersonator = Pair(malice, "Bob (Malice)"))
+            ExternalCommunicationChannel(
+                personOne = alice,
+                personTwo = malice,
+                impersonator = Pair(malice, "Bob (Malice)"),
+            )
 
         // Malice has created a fake profile on an insecure external communication channel
         // impersonating Alice. Malice reaches out to bob, who thinks it is Alice reaching out
         bobToMaliceChannel =
-            ExternalCommunicationChannel(personOne = bob, personTwo = malice, impersonator = Pair(malice, "Alice (Malice)"))
+            ExternalCommunicationChannel(
+                personOne = bob,
+                personTwo = malice,
+                impersonator = Pair(malice, "Alice (Malice)"),
+            )
 
         // Alice initiates a conversation with Bob online on an insecure communication
         // channel, in this case a second hand web shop. She wants to buy a watch from Bob.
-        aliceToMaliceChannel.sendMessage(alice, "Hello! Saw your watch, i would like to buy it.")
-        bobToMaliceChannel.sendMessage(malice, "Hello! Saw your watch, i would like to buy it.")
-        bobToMaliceChannel.sendMessage(bob, "Hello! Great, it will be 100 dollars. How do you want to pay?")
+        aliceToMaliceChannel.sendMessage(alice, "\u001B[38;5;120mHello! Saw your watch, i would like to buy it.\u001B[0m")
+        bobToMaliceChannel.sendMessage(malice, "\u001B[38;5;214mHello! Saw your watch, i would like to buy it.\u001B[0m")
+        bobToMaliceChannel.sendMessage(bob, "\u001B[38;5;120mHello! Great, it will be 100 dollars. How do you want to pay?\u001B[0m")
         aliceToMaliceChannel.sendMessage(
             malice,
-            "Hello! Great, it will be 100 dollars. How do you want to pay?",
+            "\u001B[38;5;214mHello! Great, it will be 100 dollars. How do you want to pay?\u001B[0m",
         )
         aliceToMaliceChannel.sendMessage(
             alice,
-            "Actually, could you authenticate yourself first? I can send you a link where you can sign up with the app TruPal.",
+            "\u001B[38;5;120mActually, could you authenticate yourself first? I can send you a link where you can sign up with the app TruPal.\u001B[0m",
         )
         bobToMaliceChannel.sendMessage(
             malice,
-            "Actually, could you authenticate yourself first? I can send you a link where you can sign up with the app TruPal.",
+            "\u001B[38;5;214mActually, could you authenticate yourself first? I can send you a link where you can sign up with the app TruPal.\u001B[0m",
         )
-        bobToMaliceChannel.sendMessage(bob, "Of course!")
-        aliceToMaliceChannel.sendMessage(malice, "Of course!")
-        aliceToMaliceChannel.sendMessage(malice, "Of course!")
+        bobToMaliceChannel.sendMessage(bob, "\u001B[38;5;120mOf course!\u001B[0m")
+        aliceToMaliceChannel.sendMessage(malice, "\u001B[38;5;214mOf course!\u001B[0m")
 
         // Alice authenticates herself in the trupal app and creates a P2P session. She then
         // shares the link through the chat with Malice (who she thinks is bob)
         val p2pSessionJoinUri = trupal.createP2PSession(alice)
-        aliceToMaliceChannel.sendMessage(alice, "Here is the link: $p2pSessionJoinUri")
+        aliceToMaliceChannel.sendMessage(alice, "\u001B[38;5;120mHere is the link: $p2pSessionJoinUri\u001B[0m")
 
         // Malice copies the link and sends it on to Bob, without opening it in the process.
         // Malice keeps impersonating Alice and Bob successfully on the external communication
         // channels.
-        bobToMaliceChannel.sendMessage(malice, "Here is the link: $p2pSessionJoinUri")
+        bobToMaliceChannel.sendMessage(malice, "\u001B[38;5;214mHere is the link: $p2pSessionJoinUri\u001B[0m")
 
         // Bob opens the link and authenticates himself.
         p2pSessionDataUri = trupal.joinP2PSession(bob, p2pSessionJoinUri)
@@ -126,12 +133,15 @@ class ManInTheMiddleTest() {
 
         secureCommunicationChannel.sendMessage(
             alice,
-            "Ok great, now i know our communication is secure. Can you send your account number so i can send the money?",
+            "\u001B[38;5;120mOk great, now i know our communication is secure. Can you send your account number so i can send the money?\u001B[0m",
         )
-        secureCommunicationChannel.sendMessage(bob, "Yes, it is 5054330867bob. What address should i ship the watch to?")
+        secureCommunicationChannel.sendMessage(
+            bob,
+            "\u001B[38;5;120mYes, it is 5054330867bob. What address should i ship the watch to?\u001B[0m",
+        )
         secureCommunicationChannel.sendMessage(
             alice,
-            "Alice Road 12, Pittsburg, Pennsylvana.",
+            "\u001B[38;5;120mAlice Road 12, Pittsburg, Pennsylvana.\u001B[0m",
         )
 
         aliceToMaliceChannel.printChat()
@@ -140,8 +150,8 @@ class ManInTheMiddleTest() {
         secureCommunicationChannel.printChat()
 
         println("\u001B[31mThis is red text.\u001B[0m")
-        println("\u001B[32mThis is green text.\u001B[0m")
-        println("\u001B[33mThis is yellow text.\u001B[0m")
+        println("\u001B[38;5;214m...\u001B[0m"); // Orange text
+        println("\u001B[38;5;120m...\u001B[0m") // Light Green text
         println("\u001B[34mThis is blue text.\u001B[0m")
     }
 
@@ -149,21 +159,21 @@ class ManInTheMiddleTest() {
     fun `Alice and Bob stays on insecure external communication channel (malice succeeds)`() {
         aliceToMaliceChannel.sendMessage(
             alice,
-            "Great, now i know you've authenticated! Can you send your account number so i can send the money?",
+            "\u001B[38;5;120mGreat, now i know you've authenticated! Can you send your account number so i can send the money?\u001B[0m",
         )
         bobToMaliceChannel.sendMessage(
             malice,
-            "Great, now i know you've authenticated! Can you send your account number so i can send the money?",
+            "\u001B[38;5;214mGreat, now i know you've authenticated! Can you send your account number so i can send the money?\u001B[0m",
         )
-        bobToMaliceChannel.sendMessage(bob, "Yes, it is 5054330867bob. What address should i ship the watch to?")
-        aliceToMaliceChannel.sendMessage(malice, "Yes, it is 92039586malice. What address should i ship the watch to?")
+        bobToMaliceChannel.sendMessage(bob, "\u001B[38;5;120mYes, it is 5054330867bob. What address should i ship the watch to?\u001B[0m")
+        aliceToMaliceChannel.sendMessage(malice, "\u001B[31mYes, it is 92039586malice. What address should i ship the watch to?\u001B[0m")
         aliceToMaliceChannel.sendMessage(
             alice,
-            "Alice Road 12, Pittsburg, Pennsylvana.",
+            "\u001B[38;5;120mAlice Road 12, Pittsburg, Pennsylvana.\u001B[0m",
         )
         bobToMaliceChannel.sendMessage(
             malice,
-            "Malice Road 99, Denver, Vancouver.",
+            "\u001B[31mMalice Road 99, Denver, Vancouver.\u001B[0m",
         )
 
         aliceToMaliceChannel.printChat()
@@ -416,9 +426,9 @@ class ExternalCommunicationChannel(
         message: String,
     ) {
         if (person.name == personOne.name || person.name == personTwo.name) {
-            var chatName = person.name
+            var chatName = "\u001B[38;5;120m${person.name}\u001B[0m"
             if (impersonator.first.name.isNotEmpty() && person.name == impersonator.first.name) {
-                chatName = impersonator.second
+                chatName = "\u001B[31m${impersonator.second}\u001B[0m"
             }
             chat.add(Pair(chatName, message))
         } else {
@@ -444,7 +454,7 @@ class SecureCommunicationChannel(val personOne: Person, val personTwo: Person) {
         message: String,
     ) {
         if (person.name == personOne.name || person.name == personTwo.name) {
-            chat.add(Pair(person.name, message))
+            chat.add(Pair("\u001B[38;5;120m${person.name}\u001B[0m", message))
         } else {
             throw Forbidden("User is not part of the chat", null)
         }

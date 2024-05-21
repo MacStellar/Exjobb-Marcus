@@ -22,7 +22,6 @@ import org.springframework.web.client.RestTemplate
 import org.springframework.web.client.postForEntity
 import java.net.URI
 import java.time.Instant
-import java.util.*
 
 @RestController
 class TrupalPeerToPeer(
@@ -77,6 +76,8 @@ class TrupalPeerToPeer(
             URIBuilder(truidSignupEndpoint)
                 .addParameter("response_type", "code")
                 .addParameter("client_id", clientId)
+                // TODO lägg till portrait image här ifall jag ska använda det
+//                .addParameter("scope", "truid.app/data-point/email truid.app/data-point/birthdate truid.app/data-point/portrait-image")
                 .addParameter("scope", "truid.app/data-point/email truid.app/data-point/birthdate")
                 .addParameter("redirect_uri", createP2PSessionUri)
                 .addParameter("state", createOauth2State(session))
@@ -142,6 +143,13 @@ class TrupalPeerToPeer(
                 URIBuilder(truidPresentationEndpoint)
                     .addParameter("claims", "truid.app/claim/email/v1,truid.app/claim/birthdate/v1")
                     .build()
+
+            // TODO
+            // Ändra data klasser och struktur på koden för att stödja portrait image
+//            val getPresentationUri =
+//                URIBuilder(truidPresentationEndpoint)
+//                    .addParameter("claims", "truid.app/claim/email/v1,truid.app/claim/birthdate/v1,truid.app/claim/portrait-image/v1")
+//                    .build()
 
             // Create entity with header including access token
             val header = HttpHeaders()
