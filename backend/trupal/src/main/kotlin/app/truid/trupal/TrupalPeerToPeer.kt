@@ -534,10 +534,4 @@ class TrupalPeerToPeer(
             ),
         )
     }
-
-    private fun getPersistedToken(userId: String?): String? {
-        val userToken = userTokenDB.getUserTokenByUserId(userId)
-
-        return userToken?.refreshToken
-    }
 }
