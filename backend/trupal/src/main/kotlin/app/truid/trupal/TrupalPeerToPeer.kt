@@ -165,7 +165,7 @@ class TrupalPeerToPeer(
                     PresentationResponse::class.java,
                 ).body
 
-            userId = userInfo?.sub.toString()
+            userId = userInfo?.sub?.toString() ?: throw Exception("Unexpected response from presentation. Sub was null")
             session.setAttribute("userId", userId)
 
             // Persist the refresh token
