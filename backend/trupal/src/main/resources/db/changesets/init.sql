@@ -5,6 +5,7 @@
 CREATE TABLE session
 (
     id      VARCHAR(60) DEFAULT gen_random_uuid() PRIMARY KEY,
+    status  VARCHAR   NOT NULL,
     created TIMESTAMP NOT NULL
 );
 
@@ -12,12 +13,11 @@ CREATE TABLE session
 --precondition-sql-check expectedResult:0 SELECT COUNT(to_regclass('public.userSession'));
 CREATE TABLE user_session
 (
-    id         VARCHAR(60) DEFAULT gen_random_uuid() PRIMARY KEY,
-    session_id VARCHAR   NOT NULL REFERENCES session (id) ON DELETE CASCADE,
-    cookie_id  VARCHAR   NOT NULL,
-    user_id    VARCHAR   NOT NULL,
-    user_info  VARCHAR   NOT NULL,
-    created    TIMESTAMP NOT NULL
+    id                VARCHAR(60) DEFAULT gen_random_uuid() PRIMARY KEY,
+    session_id        VARCHAR   NOT NULL REFERENCES session (id) ON DELETE CASCADE,
+    user_id           VARCHAR   NOT NULL,
+    user_presentation VARCHAR   NOT NULL,
+    created           TIMESTAMP NOT NULL
 );
 
 --changeset marcusschon:interaction.3
@@ -25,8 +25,7 @@ CREATE TABLE user_session
 CREATE TABLE user_token
 (
     id            VARCHAR(60) DEFAULT gen_random_uuid() PRIMARY KEY,
-    cookie        VARCHAR   NOT NULL UNIQUE,
-    user_id       VARCHAR   NOT NULL,
+    user_id       VARCHAR   NOT NULL UNIQUE,
     refresh_token VARCHAR   NOT NULL,
     created       TIMESTAMP NOT NULL
 );

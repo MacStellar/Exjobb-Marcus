@@ -1,8 +1,8 @@
 spring:
   datasource:
     url: jdbc:postgresql://localhost:5432/trupal
-    username: postgres
-    password: password
+    username: ${POSTGRES_USERNAME}
+    password: ${POSTGRES_PASSWORD}
   liquibase:
     change-log: classpath:db/db.changelog-master.yaml
 
@@ -23,10 +23,13 @@ web:
   peer-to-peer: ${app.domain}/peer-to-peer
 
 oauth2:
-  clientId: ${TRUID_CLIENT_ID:test}
-  clientSecret: ${TRUID_CLIENT_SECRET:test}
+  clientId: ${TRUID_CLIENT_ID:test-client-id}
+  clientSecret: ${TRUID_CLIENT_SECRET:test-client-secret}
   redirectUri:
-    signup: ${TRUID_REDIRECT_URI_SIGNUP:${app.domain}/truid/v1/complete-signup}
+    confirmSignup: ${TRUID_REDIRECT_URI_CONFIRMSIGNUP:${app.domain}/truid/v1/confirm-signup}
+    completeSignup: ${TRUID_REDIRECT_URI_COMPLETESIGNUP:${app.domain}/truid/v1/complete-signup/create}
+    create: ${TRUID_REDIRECT_URI_SIGNUP:${app.domain}/truid/v1/peer-to-peer/create}
+    join: ${TRUID_REDIRECT_URI_JOIN:${app.domain}/truid/v1/peer-to-peer/join}
   truid:
     token-endpoint: ${TRUID_BASEPATH:https://api.truid.app}/oauth2/v1/token
     signup-endpoint: ${TRUID_BASEPATH:https://api.truid.app}/oauth2/v1/authorize/confirm-signup

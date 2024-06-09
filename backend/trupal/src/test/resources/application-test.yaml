@@ -3,9 +3,10 @@ spring:
     allow-bean-definition-overriding: true
 
 oauth2:
+  clientId: test-client-id
+  clientSecret: test-client-secret
   truid:
     token-endpoint: ${wiremock.server.baseUrl}/oauth2/v1/token
-    signup-endpoint: ${wiremock.server.baseUrl}/oauth2/v1/authorize/confirm-signup
     presentation-endpoint: ${wiremock.server.baseUrl}/exchange/v1/presentation
 
 #    Används inte i SignupControllerTest:
