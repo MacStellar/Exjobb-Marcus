@@ -165,7 +165,7 @@ class TrupalPeerToPeer(
                     PresentationResponse::class.java,
                 ).body
 
-            userId = userInfo?.sub ?: throw Exception("Unexpected response from presentation. Sub was null")
+            userId = userInfo?.sub.toString()
             session.setAttribute("userId", userId)
 
             // Persist the refresh token
@@ -204,27 +204,8 @@ class TrupalPeerToPeer(
 
         val session = request.session
 
-        val p2pSession =
-            sessionDB.findById(p2pSessionId).orElseThrow {
-                P2PSessionNotFound()
-            }
-
-        when (p2pSession.status) {
-            SessionStatus.INITIALIZED -> {} // Continue
-            SessionStatus.CREATED -> {
-                throw P2PSessionStatusException("P2P-session has not been joined by user 1 yet", null)
-            }
-
-            SessionStatus.FAILED -> {
-                throw P2PSessionStatusException("P2P-Session has failed", null)
-            }
-
-            SessionStatus.COMPLETED -> {
-                throw P2PSessionStatusException("P2P-Session has already been shared and is full", null)
-            }
-            else -> {
-                throw P2PSessionStatusException("Unexpected status")
-            }
+        sessionDB.findById(p2pSessionId).orElseThrow {
+            P2PSessionNotFound()
         }
 
         val userId = session.getAttribute("userId") as String?
@@ -273,9 +254,6 @@ class TrupalPeerToPeer(
 
             SessionStatus.COMPLETED -> {
                 throw P2PSessionStatusException("P2P-Session is full", null)
-            }
-            else -> {
-                throw P2PSessionStatusException("Unexpected status")
             }
         }
 
